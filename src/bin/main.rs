@@ -3,8 +3,8 @@
 use clap::{ArgMatches, Command, arg};
 use resolve_path::PathResolveExt;
 use smpkg::CommandHandler;
+use smpkg::sdk::Manager;
 use smpkg::sdk::commands::{SDKInstaller, SDKVersion};
-use smpkg::sdk::download;
 use std::path::Path;
 use tokio;
 
@@ -20,9 +20,7 @@ pub async fn run(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(root_path)?;
     }
 
-    let matches = commands();
-
-    if let Some(("sourcemod", sourcemod_matches)) = matches.subcommand() {
+    if let Some(("sourcemod", sourcemod_matches)) = commands().subcommand() {
         let subcommand = sourcemod_matches
             .subcommand()
             .unwrap_or(("latest-version", sourcemod_matches));
@@ -80,8 +78,9 @@ pub fn commands_sourcemod() -> Command {
 }
 
 async fn sourcemo_list_handler(root: &Path) -> Result<(), Box<dyn std::error::Error + 'static>> {
-    println!("Currently installed sourcemod SDKs:");
-    let sdks = download::get_installed_sdks(root);
+    let sdk = Manager::new(root);
+    println!("🛠️ Currently installed sourcemod SDKs:");
+    let sdks = sdk.get_installed_sdks();
     for sdk in sdks {
         println!("{}", sdk);
     }
