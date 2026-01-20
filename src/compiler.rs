@@ -2,7 +2,7 @@ use std::{error::Error, path::PathBuf, process::Command};
 
 use which::which;
 
-use crate::repo;
+use crate::plugins;
 
 const COMPILER_BIN: &str = "spcomp64";
 
@@ -36,26 +36,44 @@ const COMPILER_BIN: &str = "spcomp64";
 //   sym=                      Define macro "sym" with value 0.
 pub fn compile(
     args: &CompilerArgs,
-    plugin_def: &repo::PluginDefinition,
+    plugin_def: &plugins::Definition,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(inputs) = &plugin_def.inputs {
         for input in inputs {
-            let mut command = build_command(args);
-            command.arg(input);
+            let plugin_root = match &plugin_def.path {
+                Some(p) => p,
+                None => return Err("Plugin path is not defined".into()),
+            };
 
+            let mut command = build_command(args);
+            command.arg("-D").arg(plugin_root);
+            command.arg(input);
+            // println!("Calling: {:?}", command);
+            println!("🔨 Compiling {}...", input);
             let output = command.output().expect("Failed to execute spcomp64");
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let _stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            println!("Standard Output: {}", stdout);
-            println!("Error Output: {}", stderr);
+            //println!("Standard Output: {}", stdout);
+            if !stderr.is_empty() {
+                println!("Error Output: {}", stderr);
+            } else {
+                let out_dir = match &args.output {
+                    Some(p) => p,
+                    None => plugin_root,
+                };
+                println!(
+                    "✅ Built successfully {:?}",
+                    out_dir.join(format!("{}.smx", plugin_def.name))
+                );
+            };
         }
     }
 
     Ok(())
 }
 
-// build_command 
+// build_command
 fn build_command(args: &CompilerArgs) -> Command {
     let mut command = Command::new(COMPILER_BIN);
 

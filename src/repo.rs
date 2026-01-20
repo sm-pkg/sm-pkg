@@ -1,27 +1,9 @@
 use git2;
-use serde::Deserialize;
-use std::fmt::Display;
 use std::{fs::File, io::Write, path::Path};
 
-const REPO_URL: &str = "https://github.com/leighmacdonald/smpkg-repo";
+use crate::plugins;
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct PluginDefinition {
-    pub name: String,
-    pub description: String,
-    pub version: String,
-    pub inputs: Option<Vec<String>>,
-    pub url: Option<String>,
-    pub authors: Option<Vec<String>>,
-    pub license: Option<String>,
-    pub dependencies: Option<Vec<String>>,
-}
-
-impl Display for PluginDefinition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
+const REPO_URL: &str = "https://github.com/sm-pkg/plugins";
 
 pub struct Repository<'a> {
     url: &'a str,
@@ -37,6 +19,7 @@ impl<'a> Repository<'a> {
         let body = reqwest::get(self.url).await?.bytes().await?;
         let mut file = File::create(self.root.join("index.json"))?;
         file.write_all(&body[..])?;
+        self.checkout_repo()?;
 
         Ok(())
     }
@@ -45,7 +28,7 @@ impl<'a> Repository<'a> {
         self.root
     }
 
-    fn read_index(&self) -> Result<Vec<PluginDefinition>, Box<dyn std::error::Error>> {
+    fn read_index(&self) -> Result<Vec<plugins::Definition>, Box<dyn std::error::Error>> {
         let index = match File::open(self.root.join("index.json")) {
             Ok(file) => file,
             Err(e) => {
@@ -53,11 +36,14 @@ impl<'a> Repository<'a> {
                 return Err(e.into());
             }
         };
-        let results: Vec<PluginDefinition> = serde_json::from_reader(index)?;
+        let results: Vec<plugins::Definition> = serde_json::from_reader(index)?;
         Ok(results)
     }
 
-    pub fn search(&self, query: &str) -> Result<Vec<PluginDefinition>, Box<dyn std::error::Error>> {
+    pub fn search(
+        &self,
+        query: &str,
+    ) -> Result<Vec<plugins::Definition>, Box<dyn std::error::Error>> {
         let mut packages = self.read_index()?;
         packages.retain(|p| {
             p.name.to_lowercase().contains(query) || p.description.to_lowercase().contains(query)
@@ -69,14 +55,11 @@ impl<'a> Repository<'a> {
         }
     }
 
-    //pub async fn build(name: String) {}
+    // pub async fn build(name: String) {}
     // git clone --no-checkout --depth=1 --filter=tree:0 git@github.com:leighmacdonald/smpkg-repo test-repo
     // git sparse-checkout set --no-cone /connect
     // git checkout
-    pub fn checkout_repo(
-        &self,
-        plugin: &PluginDefinition,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn checkout_repo(&self) -> Result<(), Box<dyn std::error::Error>> {
         let build_root = self.root_dir().join("repo");
         let path = build_root.as_path();
 
@@ -96,7 +79,6 @@ impl<'a> Repository<'a> {
                 .find_remote(remote_name)
                 .expect("Failed to find remote");
 
-            // Configure fetch options and callbacks (e.g., for authentication or progress)
             let mut callbacks = git2::RemoteCallbacks::new();
             callbacks.credentials(|_url, _username_from_url, _allowed_types| git2::Cred::default());
 
@@ -118,7 +100,7 @@ impl<'a> Repository<'a> {
             println!("✅ Repo update complete");
         }
 
-        println!("📥 Checking out {} into {}", &plugin.name, path.display());
+        println!("📥 Checking out into {}", path.display());
 
         Ok(())
     }
@@ -126,14 +108,20 @@ impl<'a> Repository<'a> {
     pub fn find_plugin_definitions(
         &self,
         plugins: &Vec<String>,
-    ) -> Result<Vec<PluginDefinition>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<plugins::Definition>, Box<dyn std::error::Error>> {
         let packages = self.read_index()?;
-        let mut valid_definitions: Vec<PluginDefinition> = Vec::new();
+        let mut valid_definitions: Vec<plugins::Definition> = Vec::new();
         for plugin in plugins {
             let mut found = false;
             for package in &packages {
                 if package.name == *plugin {
-                    valid_definitions.push(package.clone());
+                    let mut plugin_def = package.clone();
+                    plugin_def.path = Some(
+                        self.root
+                            .join(format!("repo/{}/src/scripting", plugin_def.name))
+                            .to_path_buf(),
+                    );
+                    valid_definitions.push(plugin_def);
                     found = true;
                     break;
                 }
@@ -149,10 +137,16 @@ impl<'a> Repository<'a> {
     pub fn find_plugin_definition(
         &self,
         plugin: &String,
-    ) -> Result<PluginDefinition, Box<dyn std::error::Error>> {
+    ) -> Result<plugins::Definition, Box<dyn std::error::Error>> {
         for known_plugin in self.read_index()? {
             if known_plugin.name == *plugin {
-                return Ok(known_plugin);
+                let mut plugin = known_plugin.clone();
+                plugin.path = Some(
+                    self.root
+                        .join(format!("repo/{}/src/scripting", &plugin.name))
+                        .to_path_buf(),
+                );
+                return Ok(plugin);
             }
         }
 

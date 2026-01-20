@@ -1,24 +1,21 @@
-#![feature(str_as_str)]
+// #![feature(str_as_str)]
 
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
-use smpkg::{
-    compiler, plugins,
-    repo::{self, Repository},
-    sdk::Manager,
-};
+use sm_pkg::{compiler, plugins, project, repo, sdk};
 use std::path::{Path, PathBuf};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_ROOT: &str = "~/.smpkg";
 const DEFAULT_BRANCH: &str = "1.12";
 const DEFAULT_OUTPUT: &str = "./output";
 const UPDATE_URL: &str =
-    "https://raw.githubusercontent.com/leighmacdonald/smpkg-repo/refs/heads/master/index.json";
+    "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.json";
 
 #[derive(Parser)]
 struct Cli {
     #[arg(short, long, default_value = DEFAULT_ROOT)]
-    root: Option<PathBuf>,
+    app_root: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -26,10 +23,18 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    #[command(about = "Install one or more packages", arg_required_else_help = true)]
-    Install {
-        #[arg(short,long, default_value = DEFAULT_OUTPUT)]
-        target: PathBuf,
+    #[command(about = "Initialize a new project")]
+    Init {
+        #[arg(short, long, default_value = ".")]
+        project_root: PathBuf,
+    },
+    #[command(about = "Add one or more plugins to a project")]
+    Add {
+        #[arg(required = true)]
+        plugins: Vec<String>,
+    },
+    #[command(about = "Remove one or more plugins from a project")]
+    Remove {
         #[arg(required = true)]
         plugins: Vec<String>,
     },
@@ -71,50 +76,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    println!("📦 smpkg - sourcemod package manager");
+    println!("📦 smpkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
-    let root = args.root.expect("No root path specified");
-    let root_path = root.try_resolve()?;
+    let app_root = args.app_root.expect("No app_root path specified");
+    let app_root_resolved = app_root.try_resolve()?.to_path_buf();
 
-    println!("🪸 Using root: {:?}", root_path);
+    println!("🪸 Using app root: {:?}", app_root_resolved);
 
-    if !root_path.exists() {
-        std::fs::create_dir_all(&root_path)?;
+    if !app_root_resolved.exists() {
+        std::fs::create_dir_all(&app_root_resolved)?;
     }
 
     match args.command {
-        Commands::SDKInstall { branch } => sdk_install(&root_path, branch).await,
-        Commands::SDKLatest { branch } => sdk_latest(&root_path, branch).await,
-        Commands::SDKList {} => sdk_list(&root_path).await,
-        Commands::Install { target, plugins } => install(&root_path, target, plugins).await,
-        Commands::Search { query } => search(&root_path, query).await,
-        Commands::Update {} => update(&root_path).await,
-        Commands::Build { plugin } => build(&root_path, plugin).await,
+        Commands::SDKInstall { branch } => sdk_install(&app_root_resolved, branch).await,
+        Commands::SDKLatest { branch } => sdk_latest(&app_root_resolved, branch).await,
+        Commands::SDKList {} => sdk_list(&app_root_resolved).await,
+        Commands::Search { query } => search(&app_root_resolved, query).await,
+        Commands::Update {} => update(&app_root_resolved).await,
+        Commands::Build { plugin } => build(&app_root_resolved, plugin).await,
+        Commands::Init { project_root } => project_init(&project_root).await,
+        Commands::Add { plugins } => plugin_add(&app_root_resolved, plugins).await,
+        Commands::Remove { plugins } => plugin_remove(&app_root_resolved, plugins).await,
     }
+}
+
+async fn plugin_add(
+    app_root: &PathBuf,
+    plugins: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = repo::Repository::new(app_root, UPDATE_URL);
+    let mut project_manager = project::Manager::new(app_root.to_path_buf());
+    project_manager.open()?;
+
+    for plugin in plugins {
+        let plugin_def = repo.find_plugin_definition(&plugin)?;
+        project_manager.add_plugin(plugin_def)?;
+    }
+
+    project_manager.save()?;
+
+    Ok(())
+}
+
+async fn plugin_remove(
+    _app_root: &Path,
+    _plugins: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
+async fn project_init(project_root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let mut project_manager = project::Manager::new(project_root.to_path_buf());
+    project_manager.open()?;
+
+    Ok(())
 }
 
 async fn build(root_path: &Path, plugin: String) -> Result<(), Box<dyn std::error::Error>> {
     let args = compiler::CompilerArgs::default();
-    let repo = Repository::new(root_path, UPDATE_URL);
+    let repo = repo::Repository::new(root_path, UPDATE_URL);
     let plugin_def = repo.find_plugin_definition(&plugin)?;
     compiler::compile(&args, &plugin_def)?;
     Ok(())
 }
 
-async fn install(
-    root_path: &Path,
-    target: PathBuf,
-    plugins: Vec<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let repo = Repository::new(root_path, UPDATE_URL);
-
-    plugins::install(repo, &target, plugins)?;
-    Ok(())
-}
-
 async fn search(root_path: &Path, query: String) -> Result<(), Box<dyn std::error::Error>> {
-    let repo = Repository::new(root_path, UPDATE_URL);
-    let matches: Vec<repo::PluginDefinition> = repo.search(&query)?;
+    let repo = repo::Repository::new(root_path, UPDATE_URL);
+    let matches: Vec<plugins::Definition> = repo.search(&query)?;
     matches
         .into_iter()
         .for_each(|p| println!("{} - {} - {}", p.name, p.version, p.description));
@@ -129,7 +157,7 @@ async fn update(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn sdk_list(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let sdk = Manager::new(root);
+    let sdk = sdk::Manager::new(root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk.get_installed_sdks();
     for sdk in sdks {
@@ -139,7 +167,7 @@ async fn sdk_list(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn sdk_latest(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
-    let result = Manager::new(root).fetch_latest_version(&branch).await;
+    let result = sdk::Manager::new(root).fetch_latest_version(&branch).await;
     match result {
         Ok(version) => {
             println!("🕓 Latest version: {version}");
@@ -150,6 +178,6 @@ async fn sdk_latest(root: &Path, branch: String) -> Result<(), Box<dyn std::erro
 }
 
 async fn sdk_install(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
-    let sdk = Manager::new(root);
+    let sdk = sdk::Manager::new(root);
     sdk.fetch_version(branch).await
 }

@@ -26,3 +26,4 @@ devenv.local.yaml
 .sdk
 *.sp
 *.smx
+sm-pkg.json
