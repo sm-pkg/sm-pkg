@@ -38,7 +38,8 @@ enum Commands {
         #[arg(required = true)]
         plugins: Vec<String>,
     },
-
+    #[command(about = "List configured project pacakges")]
+    List {},
     #[command(about = "Search package cache", arg_required_else_help = true)]
     Search {
         #[arg(required = true)]
@@ -97,6 +98,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Init { project_root } => project_init(&project_root).await,
         Commands::Add { plugins } => plugin_add(&app_root_resolved, plugins).await,
         Commands::Remove { plugins } => plugin_remove(&app_root_resolved, plugins).await,
+        Commands::List {} => plugin_list(&app_root_resolved).await,
     }
 }
 
@@ -115,6 +117,9 @@ async fn plugin_add(
 
     project_manager.save()?;
 
+    Ok(())
+}
+async fn plugin_list(_app_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
