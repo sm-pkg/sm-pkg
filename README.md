@@ -19,16 +19,24 @@ Track sourcemod stable and dev branches for support only. This means ensuring al
 
 Some sort of package overlay system, maybe similar to nix, to allow for customizing packages.
 
-We want to distribute absolutely *no smx binaries*, this would be an anti-goal. Instead source is checked out from the repo and plugins
-are built locally as needed. This helps ensure that plugins are:
+Source is checked out from the repo and plugins are built locally as needed. This helps ensure that plugins are:
 
-1. Reproducible
-2. Always able to be rebuilt over time, reducing bitrot.
+1. As reproducible as possible
+2. Always able to be rebuilt over time, reducing bitrot with things like newer syntax.
+3. Can be more easily audited.
+
+There is currently no intention to support anything but source based distribution, however this may change in the future and support
+for some sort of binary distribution could eventually be considered.
 
 A per-project / srcds instance configuration and lockfile. Essentially this means allowing support for configuring multiple different instances
 of a srcds. Maybe including some sort of presets, eg: all plugins required for mge?
 
-Some sort of facility for generating configs maybe.
+Some sort of facility for generating configs, via a post-install script? Templates could be used to generate the
+corresponding ini or kv files.
+
+Enable/disable plugin for a installation.
+
+Uninstallation of plugins? Not sure how possible this really is without expending too much effort on the feature. 
 
 ### Why Copy Sources And Not Use git repos or submodules?
 

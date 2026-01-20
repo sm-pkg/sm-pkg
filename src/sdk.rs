@@ -37,12 +37,10 @@ impl<'a> Manager<'a> {
     pub fn get_installed_sdks(&self) -> Vec<String> {
         let mut sdks = Vec::new();
         if let Ok(entries) = std::fs::read_dir(self.root.join("sdks")) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    if let Some(name) = entry.file_name().to_str() {
-                        if name.starts_with("sourcemod-") {
-                            sdks.push(name.to_string());
-                        }
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if name.starts_with("sourcemod-") {
+                        sdks.push(name.to_string());
                     }
                 }
             }
@@ -69,7 +67,7 @@ impl<'a> Manager<'a> {
                         remove_file(&current_root)?;
                     }
 
-                    let _ = fs::symlink(sm_root, &current_root)?;
+                    fs::symlink(sm_root, &current_root)?;
                     println!("✅ SDK activated successfully");
                     println!(
                         "🚨 You probably want to add {:?} to your $PATH if you have not already",

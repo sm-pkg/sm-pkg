@@ -17,6 +17,9 @@ flate2 = { version = "1.1.8", features = ["zlib-rs"] }
 git2 = { version = "0.20.3", features = ["https", "ssh"] }
 reqwest = "0.13.1"
 resolve-path = "0.1.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 tar = "0.4.44"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 update = "0.0.0"
+which = "8.0.0"

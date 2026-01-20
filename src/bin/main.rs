@@ -1,113 +1,155 @@
 #![feature(str_as_str)]
 
-use clap::{ArgMatches, Command, arg};
+use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
-use smpkg::sdk::Manager;
-use std::path::Path;
-use tokio;
+use smpkg::{
+    compiler, plugins,
+    repo::{self, Repository},
+    sdk::Manager,
+};
+use std::path::{Path, PathBuf};
+
+const DEFAULT_ROOT: &str = "~/.smpkg";
+const DEFAULT_BRANCH: &str = "1.12";
+const DEFAULT_OUTPUT: &str = "./output";
+const UPDATE_URL: &str =
+    "https://raw.githubusercontent.com/leighmacdonald/smpkg-repo/refs/heads/master/index.json";
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(short, long, default_value = DEFAULT_ROOT)]
+    root: Option<PathBuf>,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    #[command(about = "Install one or more packages", arg_required_else_help = true)]
+    Install {
+        #[arg(short,long, default_value = DEFAULT_OUTPUT)]
+        target: PathBuf,
+        #[arg(required = true)]
+        plugins: Vec<String>,
+    },
+
+    #[command(about = "Search package cache", arg_required_else_help = true)]
+    Search {
+        #[arg(required = true)]
+        query: String,
+    },
+
+    #[command(about = "Update package cache")]
+    Update {},
+
+    #[command(about = "Build a plugin")]
+    Build {
+        #[arg(required = true)]
+        plugin: String,
+    },
+
+    #[command(about = "Download and install sourcemod")]
+    SDKInstall {
+        #[arg(default_value = DEFAULT_BRANCH)]
+        branch: String,
+    },
+
+    #[command(about = "List installed sourcemod versions")]
+    SDKList {},
+
+    #[command(about = "Fetches the latest version of sourcemod for a branch")]
+    SDKLatest {
+        #[arg(default_value = DEFAULT_BRANCH)]
+        branch: String,
+    },
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let root = "~/.smpkg".try_resolve()?;
-    let root_path = root.as_path();
-    run(root_path).await
+    run().await
 }
 
-pub async fn run(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    println!("📦 smpkg - sourcemod package manager");
+    let args = Cli::parse();
+    let root = args.root.expect("No root path specified");
+    let root_path = root.try_resolve()?;
+
+    println!("🪸 Using root: {:?}", root_path);
+
     if !root_path.exists() {
-        std::fs::create_dir_all(root_path)?;
+        std::fs::create_dir_all(&root_path)?;
     }
 
-    if let Some(("sourcemod", sourcemod_matches)) = commands().subcommand() {
-        let subcommand = sourcemod_matches
-            .subcommand()
-            .unwrap_or(("latest-version", sourcemod_matches));
-
-        match subcommand {
-            ("latest-version", sourcemod_matches) => {
-                execute_latest_version(root_path, sourcemod_matches).await
-            }
-            ("install", sourcemod_matches) => execute_install(root_path, sourcemod_matches).await,
-            ("ls", _) => sourcemo_list_handler(root_path).await,
-            (_, _) => Ok(()),
-        }
-    } else {
-        Ok(())
+    match args.command {
+        Commands::SDKInstall { branch } => sdk_install(&root_path, branch).await,
+        Commands::SDKLatest { branch } => sdk_latest(&root_path, branch).await,
+        Commands::SDKList {} => sdk_list(&root_path).await,
+        Commands::Install { target, plugins } => install(&root_path, target, plugins).await,
+        Commands::Search { query } => search(&root_path, query).await,
+        Commands::Update {} => update(&root_path).await,
+        Commands::Build { plugin } => build(&root_path, plugin).await,
     }
 }
 
-pub fn commands() -> ArgMatches {
-    return Command::new("smpkg")
-        .about("A simple package manager")
-        // .version(crate_version!)
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(commands_sourcemod())
-        .get_matches();
+async fn build(root_path: &Path, plugin: String) -> Result<(), Box<dyn std::error::Error>> {
+    let args = compiler::CompilerArgs::default();
+    let repo = Repository::new(root_path, UPDATE_URL);
+    let plugin_def = repo.find_plugin_definition(&plugin)?;
+    compiler::compile(&args, &plugin_def)?;
+    Ok(())
 }
 
-pub fn sourcemod_latest_version() -> Command {
-    Command::new("latest-version")
-        .short_flag('v')
-        .about("Fetches the latest version of Sourcemod")
-        .arg(arg!(<branch> "The remote branch"))
+async fn install(
+    root_path: &Path,
+    target: PathBuf,
+    plugins: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = Repository::new(root_path, UPDATE_URL);
+
+    plugins::install(repo, &target, plugins)?;
+    Ok(())
 }
 
-pub fn sourcemod_install() -> Command {
-    Command::new("install")
-        .short_flag('i')
-        .about("Download and install sourcemod")
-        .arg(arg!(<branch> "The remote branch"))
+async fn search(root_path: &Path, query: String) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = Repository::new(root_path, UPDATE_URL);
+    let matches: Vec<repo::PluginDefinition> = repo.search(&query)?;
+    matches
+        .into_iter()
+        .for_each(|p| println!("{} - {} - {}", p.name, p.version, p.description));
+    Ok(())
 }
 
-pub fn sourcemo_list() -> Command {
-    Command::new("ls").about("List installed sourcemod versions")
+async fn update(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = repo::Repository::new(root_path, UPDATE_URL);
+    repo.update().await?;
+    println!("Updated local package cache");
+    Ok(())
 }
 
-pub fn commands_sourcemod() -> Command {
-    Command::new("sourcemod")
-        .about("Sourcemod distribution management commands")
-        .alias("sm")
-        .arg_required_else_help(true)
-        .subcommand(sourcemod_latest_version())
-        .subcommand(sourcemod_install())
-}
-
-async fn sourcemo_list_handler(root: &Path) -> Result<(), Box<dyn std::error::Error + 'static>> {
+async fn sdk_list(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let sdk = Manager::new(root);
-    println!("🛠️ Currently installed sourcemod SDKs:");
+    println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk.get_installed_sdks();
     for sdk in sdks {
-        println!("{}", sdk);
+        println!("🏷️  {}", sdk);
     }
     Ok(())
 }
 
-async fn execute_latest_version(
-    root: &Path,
-    latest_version_matches: &ArgMatches,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let branch = latest_version_matches
-        .get_one::<String>("branch")
-        .expect("Invalid branch");
-    let result = Manager::new(root).fetch_latest_version(branch).await;
+async fn sdk_latest(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
+    let result = Manager::new(root).fetch_latest_version(&branch).await;
     match result {
         Ok(version) => {
-            println!("Latest version: {version}");
+            println!("🕓 Latest version: {version}");
             Ok(())
         }
         Err(e) => Err(e.into()),
     }
 }
 
-async fn execute_install(
-    root: &Path,
-    latest_version_matches: &ArgMatches,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let branch = latest_version_matches
-        .get_one::<String>("branch")
-        .expect("Invalid branch")
-        .clone();
+async fn sdk_install(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
     let sdk = Manager::new(root);
     sdk.fetch_version(branch).await
 }
