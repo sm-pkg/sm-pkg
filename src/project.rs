@@ -1,18 +1,16 @@
+use crate::plugins;
+use inquire::{InquireError, Select};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::Display,
     fs::File,
     path::{self, PathBuf},
 };
 
-use inquire::{InquireError, Select};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use crate::plugins;
-
 pub const PROJECT_FILE: &str = "sm-pkg.json";
 
 // https://wiki.alliedmods.net/Required_Versions_%28SourceMod%29
-enum Game {
+pub enum Game {
     TF2,
     CSGO,
     L4D2,
@@ -55,8 +53,8 @@ impl Display for Game {
 
 #[derive(Serialize, Deserialize)]
 pub struct Project {
-    game: Game,
-    plugins: Option<Vec<String>>,
+    pub game: Game,
+    pub plugins: Vec<String>,
 }
 
 pub struct Manager {
@@ -69,24 +67,44 @@ impl Manager {
         Manager { root, config: None }
     }
 
+    pub fn open_or_new(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        match self.project_file_path().exists() {
+            true => Some(self.existing_project()?),
+            false => Some(self.create_package_config()?),
+        };
+        println!(
+            "🟢 Loaded package config {:?}",
+            self.root.join(PROJECT_FILE)
+        );
+        Ok(())
+    }
+
     pub fn open(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let project_file = self.project_file_path();
-        if project_file.exists() {
-            self.config = Some(self.existing_project()?);
-        } else {
-            self.config = Some(self.create()?);
-        }
+        match self.project_file_path().exists() {
+            true => Some(self.existing_project()?),
+            false => {
+                return Err(format!(
+                    "❗No {} found, has the project been initialized?",
+                    PROJECT_FILE,
+                )
+                .into());
+            }
+        };
+        println!(
+            "📂 Loaded package config {:?}",
+            self.root.join(PROJECT_FILE)
+        );
         Ok(())
     }
 
     pub fn project_file_path(&self) -> PathBuf {
-        self.root.join(PROJECT_FILE)
+        PROJECT_FILE.into()
     }
 
-    pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_package_config(&self) -> Result<(), Box<dyn std::error::Error>> {
         let config = match self.config {
             Some(ref config) => config,
-            None => return Err("No config?".into()),
+            None => return Err("❗ No config?".into()),
         };
         let file = File::create(self.project_file_path())?;
         serde_json::to_writer_pretty(file, &config)?;
@@ -94,43 +112,53 @@ impl Manager {
         Ok(())
     }
 
+    fn has_plugin(&self, plugin_name: &str) -> bool {
+        match self.config {
+            None => false,
+            Some(ref config) => config
+                .plugins
+                .contains(&plugin_name.to_string().to_lowercase()),
+        }
+    }
+
     pub fn add_plugin(
         &mut self,
         plugin: plugins::Definition,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.has_plugin(&plugin.name) {
+            return Err("❗ Plugin already exists".into());
+        }
         match &mut self.config {
             Some(config) => {
-                if let Some(ref mut plugins) = config.plugins {
-                    plugins.push(plugin.name);
-                } else {
-                    config.plugins = Some(vec![plugin.name]);
-                }
-
+                config.plugins.push(plugin.name.to_lowercase());
                 Ok(())
             }
-            None => Err("No config?".into()),
+            None => Err("❗ No config?".into()),
         }
     }
 
-    fn existing_project(&self) -> Result<Project, Box<dyn std::error::Error>> {
+    fn existing_project(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let file = File::open(self.project_file_path())?;
         let existing_config: Project = serde_json::from_reader(file)?;
         println!(
-            "🔴 Existing project found! (game: {:?})",
+            "🔎 Existing project found! (game: {:?})",
             existing_config.game.to_string()
         );
-        Ok(existing_config)
+        self.config = Some(existing_config);
+        Ok(())
     }
 
-    fn create(&self) -> Result<Project, Box<dyn std::error::Error>> {
+    fn create_package_config(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let options: Vec<Game> = vec![Game::TF2, Game::L4D2, Game::CSGO, Game::OTHER];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
-        match game {
-            Ok(choice) => Ok(Project {
+        self.config = match game {
+            Ok(choice) => Some(Project {
                 game: choice,
-                plugins: Some(Vec::new()),
+                plugins: Vec::new(),
             }),
-            Err(_) => Err("❗ Failed to select a game".into()),
-        }
+            Err(_) => return Err("❗ Failed to select a game".into()),
+        };
+        self.save_package_config()?;
+        Ok(())
     }
 }

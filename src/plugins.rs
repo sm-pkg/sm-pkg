@@ -1,8 +1,12 @@
-use std::{fmt::Display, fs, path::PathBuf};
+use std::{
+    fmt::Display,
+    fs::{self, create_dir_all, remove_dir_all},
+    path::PathBuf,
+};
 
 use serde::Deserialize;
 
-use crate::repo::Repository;
+use crate::{compiler, fsutil, repo::Repository};
 
 /// Definition of a plugin.
 #[derive(Debug, Deserialize, Clone)]
@@ -12,7 +16,7 @@ pub struct Definition {
     pub description: String,
     pub version: String,
     /// Which plugin scripts to compile from the plugin's directory.
-    pub inputs: Option<Vec<String>>,
+    pub inputs: Option<Vec<PathBuf>>,
     pub url: Option<String>,
     pub authors: Option<Vec<String>>,
     pub license: Option<String>,
@@ -55,4 +59,45 @@ fn perform_install(
 
     //fsutil::copy_dir_all(plugin.path(), repo_root)?;
     Ok(())
+}
+
+pub struct Builder {
+    root: PathBuf,
+}
+
+impl Builder {
+    pub fn new(root: PathBuf) -> Self {
+        Self { root }
+    }
+
+    pub fn build(&self, plugin_def: Definition) -> Result<(), Box<dyn std::error::Error>> {
+        let build_root = self.setup_build_root(&plugin_def)?;
+        let mut args = compiler::CompilerArgs::default();
+        args.active_dir = Some(build_root.join("src/scripting"));
+
+        println!("🔨 Build root {:?}", args.active_dir);
+        compiler::compile(&mut args, &plugin_def)?;
+        Ok(())
+    }
+
+    fn setup_build_root(
+        &self,
+        plugin_def: &Definition,
+    ) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let build_root = self.build_root(&plugin_def);
+        if build_root.exists() {
+            remove_dir_all(&build_root)?;
+        }
+        create_dir_all(&build_root)?;
+        let src = self.root.join("repo").join(&plugin_def.name);
+        if !src.exists() {
+            return Err("plugin source directory does not exist?".into());
+        }
+        fsutil::copy_dir_all(src, &build_root)?;
+        Ok(build_root)
+    }
+
+    fn build_root(&self, plugin_def: &Definition) -> PathBuf {
+        self.root.join("build").join(plugin_def.name.to_lowercase())
+    }
 }

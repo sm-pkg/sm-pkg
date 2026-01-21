@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf, process::Command};
+use std::{error::Error, fs, path::PathBuf, process::Command};
 
 use which::which;
 
@@ -35,38 +35,45 @@ const COMPILER_BIN: &str = "spcomp64";
 //   sym=val                   Define macro "sym" with value "val".
 //   sym=                      Define macro "sym" with value 0.
 pub fn compile(
-    args: &CompilerArgs,
+    args: &mut CompilerArgs,
     plugin_def: &plugins::Definition,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(inputs) = &plugin_def.inputs {
         for input in inputs {
-            let plugin_root = match &plugin_def.path {
-                Some(p) => p,
-                None => return Err("Plugin path is not defined".into()),
+            let mut out_bin = input.clone();
+            out_bin.set_extension("smx");
+
+            args.output = match &args.active_dir {
+                Some(dir) => {
+                    let out_dir = dir.join("..").join("plugins");
+                    if !out_dir.exists() {
+                        fs::create_dir_all(&out_dir)?;
+                    }
+
+                    Some(out_dir.join(&out_bin))
+                }
+                None => Some(PathBuf::from(&out_bin)),
             };
+
+            // if Some(&out_bin) != args.output {
+            //     out_bin.set_extension("smx");
+            // }
 
             let mut command = build_command(args);
-            command.arg("-D").arg(plugin_root);
             command.arg(input);
-            // println!("Calling: {:?}", command);
-            println!("🔨 Compiling {}...", input);
+            println!("Calling: {:?}", command);
+            println!("🔨 Compiling {:?}...", input);
+            println!("🔨 Into {:?}", &args.output);
             let output = command.output().expect("Failed to execute spcomp64");
-            let _stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-
-            //println!("Standard Output: {}", stdout);
+            match args.verbose.unwrap_or(0) {
+                0 => (),
+                _ => print!("{}", stdout),
+            }
             if !stderr.is_empty() {
-                println!("Error Output: {}", stderr);
-            } else {
-                let out_dir = match &args.output {
-                    Some(p) => p,
-                    None => plugin_root,
-                };
-                println!(
-                    "✅ Built successfully {:?}",
-                    out_dir.join(format!("{}.smx", plugin_def.name))
-                );
-            };
+                print!("{}", stderr);
+            }
         }
     }
 

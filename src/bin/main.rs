@@ -2,13 +2,13 @@
 
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
-use sm_pkg::{compiler, plugins, project, repo, sdk};
+use sm_pkg::{plugins, project, repo, sdk};
 use std::path::{Path, PathBuf};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_ROOT: &str = "~/.smpkg";
 const DEFAULT_BRANCH: &str = "1.12";
-const DEFAULT_OUTPUT: &str = "./output";
+//const DEFAULT_OUTPUT: &str = "./output";
 const UPDATE_URL: &str =
     "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.json";
 
@@ -108,18 +108,35 @@ async fn plugin_add(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let repo = repo::Repository::new(app_root, UPDATE_URL);
     let mut project_manager = project::Manager::new(app_root.to_path_buf());
-    project_manager.open()?;
+    project_manager.open_or_new()?;
 
     for plugin in plugins {
         let plugin_def = repo.find_plugin_definition(&plugin)?;
         project_manager.add_plugin(plugin_def)?;
     }
 
-    project_manager.save()?;
+    project_manager.save_package_config()?;
 
     Ok(())
 }
-async fn plugin_list(_app_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+
+async fn plugin_list(app_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut pm = project::Manager::new(app_root.to_path_buf());
+    pm.open()?;
+    match pm.config {
+        None => return Err("❗ No package config found".into()),
+        Some(config) => {
+            println!("📋 Plugins added to package:");
+            match config.plugins.is_empty() {
+                true => println!("🤷‍♂️ No plugins added"),
+                false => {
+                    for plugin in config.plugins {
+                        println!("- {}", plugin);
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -132,16 +149,17 @@ async fn plugin_remove(
 
 async fn project_init(project_root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut project_manager = project::Manager::new(project_root.to_path_buf());
-    project_manager.open()?;
+    project_manager.open_or_new()?;
 
     Ok(())
 }
 
-async fn build(root_path: &Path, plugin: String) -> Result<(), Box<dyn std::error::Error>> {
-    let args = compiler::CompilerArgs::default();
+async fn build(root_path: &PathBuf, plugin: String) -> Result<(), Box<dyn std::error::Error>> {
     let repo = repo::Repository::new(root_path, UPDATE_URL);
     let plugin_def = repo.find_plugin_definition(&plugin)?;
-    compiler::compile(&args, &plugin_def)?;
+    let builder = plugins::Builder::new(root_path.clone());
+    builder.build(plugin_def)?;
+
     Ok(())
 }
 
