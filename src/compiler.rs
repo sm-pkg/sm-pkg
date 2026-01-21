@@ -4,7 +4,12 @@ use which::which;
 
 use crate::plugins;
 
+#[cfg(target_pointer_width = "64")]
 const COMPILER_BIN: &str = "spcomp64";
+
+#[cfg(target_pointer_width = "32")]
+// Maybe still people using this since 32bit srcds is still everywhere?
+const COMPILER_BIN: &str = "spcomp";
 
 // Usage: spcomp64 [options] <filename> [filename...]
 // optional arguments:
@@ -55,15 +60,15 @@ pub fn compile(
                 None => Some(PathBuf::from(&out_bin)),
             };
 
-            // if Some(&out_bin) != args.output {
-            //     out_bin.set_extension("smx");
-            // }
-
             let mut command = build_command(args);
             command.arg(input);
             println!("Calling: {:?}", command);
             println!("🔨 Compiling {:?}...", input);
-            println!("🔨 Into {:?}", &args.output);
+            match &args.output {
+                Some(out) => println!("🔨 Into {:?}", out),
+                None => println!("🔨 Into "),
+            }
+
             let output = command.output().expect("Failed to execute spcomp64");
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);

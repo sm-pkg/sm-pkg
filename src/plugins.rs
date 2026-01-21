@@ -80,6 +80,16 @@ impl Builder {
         Ok(())
     }
 
+    // fn install(
+    //     &self,
+    //     plugin_def: &Definition,
+    //     target: &PathBuf,
+    // ) -> Result<(), Box<dyn std::error::Error>> {
+    //     Ok(())
+    // }
+
+    /// Setup a new clean build root containing the plugin sources. This wipes all
+    /// existing build artifacts from the plugins build root if it previous existed.
     fn setup_build_root(
         &self,
         plugin_def: &Definition,

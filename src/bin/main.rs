@@ -1,13 +1,13 @@
-// #![feature(str_as_str)]
-
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
-use sm_pkg::{plugins, project, repo, sdk};
+use sm_pkg::{
+    plugins, project, repo,
+    sdk::{self, Branch, Runtime},
+};
 use std::path::{Path, PathBuf};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_ROOT: &str = "~/.smpkg";
-const DEFAULT_BRANCH: &str = "1.12";
 //const DEFAULT_OUTPUT: &str = "./output";
 const UPDATE_URL: &str =
     "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.json";
@@ -57,8 +57,11 @@ enum Commands {
 
     #[command(about = "Download and install sourcemod")]
     SDKInstall {
-        #[arg(default_value = DEFAULT_BRANCH)]
-        branch: String,
+        #[arg(short, long, default_value_t, value_enum)]
+        branch: Branch,
+
+        #[arg(short, long, default_value_t, value_enum)]
+        runtime: Runtime,
     },
 
     #[command(about = "List installed sourcemod versions")]
@@ -66,8 +69,11 @@ enum Commands {
 
     #[command(about = "Fetches the latest version of sourcemod for a branch")]
     SDKLatest {
-        #[arg(default_value = DEFAULT_BRANCH)]
-        branch: String,
+        #[arg(short, long, default_value_t, value_enum)]
+        branch: Branch,
+
+        #[arg(short, long, default_value_t, value_enum)]
+        runtime: Runtime,
     },
 }
 
@@ -89,8 +95,12 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match args.command {
-        Commands::SDKInstall { branch } => sdk_install(&app_root_resolved, branch).await,
-        Commands::SDKLatest { branch } => sdk_latest(&app_root_resolved, branch).await,
+        Commands::SDKInstall { branch, runtime } => {
+            sdk_install(&app_root_resolved, &runtime, &branch).await
+        }
+        Commands::SDKLatest { branch, runtime } => {
+            sdk_latest(&app_root_resolved, &runtime, &branch).await
+        }
         Commands::SDKList {} => sdk_list(&app_root_resolved).await,
         Commands::Search { query } => search(&app_root_resolved, query).await,
         Commands::Update {} => update(&app_root_resolved).await,
@@ -179,8 +189,8 @@ async fn update(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn sdk_list(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let sdk = sdk::Manager::new(root);
+async fn sdk_list(root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let sdk = sdk::Manager::new(&root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk.get_installed_sdks();
     for sdk in sdks {
@@ -189,18 +199,25 @@ async fn sdk_list(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn sdk_latest(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
-    let result = sdk::Manager::new(root).fetch_latest_version(&branch).await;
-    match result {
-        Ok(version) => {
-            println!("🕓 Latest version: {version}");
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
-    }
+async fn sdk_latest(
+    root: &PathBuf,
+    runtime: &Runtime,
+    branch: &Branch,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let manager = sdk::Manager::new(&root);
+    let version = match runtime {
+        Runtime::Metamod => manager.fetch_latest_metamod_version(&branch).await?,
+        Runtime::Sourcemod => manager.fetch_latest_sourcemod_version(&branch).await?,
+    };
+
+    println!("🕓 Latest version: {version}");
+    Ok(())
 }
 
-async fn sdk_install(root: &Path, branch: String) -> Result<(), Box<dyn std::error::Error>> {
-    let sdk = sdk::Manager::new(root);
-    sdk.fetch_version(branch).await
+async fn sdk_install(
+    root: &PathBuf,
+    runtime: &Runtime,
+    branch: &Branch,
+) -> Result<(), Box<dyn std::error::Error>> {
+    sdk::Manager::new(&root).install_sdk(runtime, branch).await
 }
