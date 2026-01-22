@@ -1,6 +1,6 @@
-use crate::plugins;
+use crate::{plugins, sdk::Branch};
 use inquire::{InquireError, Select};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     fs::File,
@@ -10,61 +10,51 @@ use std::{
 pub const PROJECT_FILE: &str = "sm-pkg.json";
 
 // https://wiki.alliedmods.net/Required_Versions_%28SourceMod%29
+// https://github.com/alliedmodders/sourcemod/tree/master/gamedata/sdktools.games
+#[derive(clap::ValueEnum, Clone, Debug, Serialize, Default, Deserialize)]
 pub enum Game {
-    TF2,
-    CSGO,
-    L4D2,
-    OTHER,
+    #[default]
+    TF,
+    HL2,
 }
 
-impl Serialize for Game {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for Game {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "tf2" => Ok(Game::TF2),
-            "csgo" => Ok(Game::CSGO),
-            "l4d2" => Ok(Game::L4D2),
-            _ => Ok(Game::OTHER),
+impl Game {
+    pub fn mod_folder(&self) -> PathBuf {
+        match self {
+            Game::TF => PathBuf::from("tf"),
+            Game::HL2 => PathBuf::from("hl2"),
         }
     }
 }
+
 impl Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Game::TF2 => write!(f, "tf2"),
-            Game::CSGO => write!(f, "csgo"),
-            Game::L4D2 => write!(f, "l4d2"),
-            _ => write!(f, "other"),
+            Game::TF => write!(f, "Team Fortress 2"),
+            Game::HL2 => write!(f, "Half-Life 2"),
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Project {
+pub struct Package {
     pub game: Game,
+    pub branch: Branch,
     pub plugins: Vec<String>,
 }
 
 pub struct Manager {
     pub root: path::PathBuf,
-    pub config: Option<Project>,
+    pub package: Option<Package>,
 }
 
 impl Manager {
     pub fn new(root: path::PathBuf) -> Self {
-        Manager { root, config: None }
+        println!("🏗️ Using project root {:?}", root);
+        Manager {
+            root,
+            package: None,
+        }
     }
 
     pub fn open_or_new(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -72,10 +62,7 @@ impl Manager {
             true => Some(self.existing_project()?),
             false => Some(self.create_package_config()?),
         };
-        println!(
-            "🟢 Loaded package config {:?}",
-            self.root.join(PROJECT_FILE)
-        );
+        println!("🟢 Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
@@ -90,19 +77,16 @@ impl Manager {
                 .into());
             }
         };
-        println!(
-            "📂 Loaded package config {:?}",
-            self.root.join(PROJECT_FILE)
-        );
+        println!("📂 Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
     pub fn project_file_path(&self) -> PathBuf {
-        PROJECT_FILE.into()
+        self.root.join(PROJECT_FILE)
     }
 
     pub fn save_package_config(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let config = match self.config {
+        let config = match self.package {
             Some(ref config) => config,
             None => return Err("❗ No config?".into()),
         };
@@ -113,7 +97,7 @@ impl Manager {
     }
 
     fn has_plugin(&self, plugin_name: &str) -> bool {
-        match self.config {
+        match self.package {
             None => false,
             Some(ref config) => config
                 .plugins
@@ -128,7 +112,7 @@ impl Manager {
         if self.has_plugin(&plugin.name) {
             return Err("❗ Plugin already exists".into());
         }
-        match &mut self.config {
+        match &mut self.package {
             Some(config) => {
                 config.plugins.push(plugin.name.to_lowercase());
                 Ok(())
@@ -139,20 +123,25 @@ impl Manager {
 
     fn existing_project(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let file = File::open(self.project_file_path())?;
-        let existing_config: Project = serde_json::from_reader(file)?;
+        let existing_config: Package = serde_json::from_reader(file)?;
         println!(
             "🔎 Existing project found! (game: {:?})",
             existing_config.game.to_string()
         );
-        self.config = Some(existing_config);
+        self.package = Some(existing_config);
         Ok(())
     }
 
     fn create_package_config(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let options: Vec<Game> = vec![Game::TF2, Game::L4D2, Game::CSGO, Game::OTHER];
+        let branch_opts = vec![Branch::Stable, Branch::Dev];
+        let branch: Result<Branch, InquireError> =
+            Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
+
+        let options: Vec<Game> = vec![Game::TF, Game::HL2];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
-        self.config = match game {
-            Ok(choice) => Some(Project {
+        self.package = match game {
+            Ok(choice) => Some(Package {
+                branch: branch?,
                 game: choice,
                 plugins: Vec::new(),
             }),

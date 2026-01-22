@@ -78,7 +78,7 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -a, --app-root <APP_ROOT>  [default: ~/.smpkg]
+  -a, --app-root <APP_ROOT>  [default: ~/.sm-pkg]
   -h, --help                 Print help
 ```
 

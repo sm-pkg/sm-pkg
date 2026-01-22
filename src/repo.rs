@@ -56,7 +56,7 @@ impl<'a> Repository<'a> {
     }
 
     // pub async fn build(name: String) {}
-    // git clone --no-checkout --depth=1 --filter=tree:0 git@github.com:leighmacdonald/smpkg-repo test-repo
+    // git clone --no-checkout --depth=1 --filter=tree:0 git@github.com:sm-pkg/plugins plugins
     // git sparse-checkout set --no-cone /connect
     // git checkout
     pub fn checkout_repo(&self) -> Result<(), Box<dyn std::error::Error>> {

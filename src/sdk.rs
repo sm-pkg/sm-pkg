@@ -1,6 +1,6 @@
 use flate2::read::GzDecoder;
 use reqwest::Error;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     fs::{File, create_dir_all, remove_file},
@@ -19,7 +19,7 @@ pub enum Runtime {
     Metamod,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug, Serialize, Default)]
+#[derive(clap::ValueEnum, Clone, Debug, Serialize, Default, Deserialize)]
 pub enum Branch {
     #[default]
     Stable,
@@ -29,14 +29,14 @@ pub enum Branch {
 impl Display for Branch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Branch::Stable => write!(f, "1.12"),
-            Branch::Dev => write!(f, "1.13"),
+            Branch::Stable => write!(f, "stable"),
+            Branch::Dev => write!(f, "dev"),
         }
     }
 }
 
 pub struct Manager<'a> {
-    /// The root directory 
+    /// The root directory
     root: &'a PathBuf,
 }
 
@@ -62,24 +62,48 @@ impl<'a> Manager<'a> {
         runtime: &Runtime,
         branch: &Branch,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let out_path = self.root.join(format!("sdks/sourcemod-{}", branch));
+        let out_path = self.root.join(format!(
+            "sdks/sourcemod-{}",
+            self.get_sdk_branch_version(runtime, branch)
+        ));
         let cache_path = self.root.join(DL_CACHE);
         if !cache_path.exists() {
             create_dir_all(&cache_path)?;
         }
         match runtime {
-            Runtime::Sourcemod => self.install_sourcemod(branch, &out_path).await,
+            Runtime::Sourcemod => {
+                self.install_sourcemod(branch, &out_path).await?;
+                self.activate_sdk(branch)
+            }
             Runtime::Metamod => self.install_metamod(branch, &out_path).await,
         }
     }
 
-    pub async fn fetch_latest_sourcemod_version(&self, branch: &Branch) -> Result<String, Error> {
-        let target = format!("https://sm.alliedmods.net/smdrop/{branch}/sourcemod-latest-linux");
+    fn get_sdk_branch_version(&self, runtime: &Runtime, branch: &Branch) -> &str {
+        match runtime {
+            Runtime::Sourcemod => match branch {
+                Branch::Stable => "1.12",
+                Branch::Dev => "1.13",
+            },
+            Runtime::Metamod => match branch {
+                Branch::Stable => "1.12",
+                Branch::Dev => "2.0",
+            },
+        }
+    }
+    pub async fn fetch_latest_sourcemod_build(&self, branch: &Branch) -> Result<String, Error> {
+        let target = format!(
+            "https://sm.alliedmods.net/smdrop/{}/sourcemod-latest-linux",
+            self.get_sdk_branch_version(&Runtime::Sourcemod, branch)
+        );
         reqwest::get(target).await?.text().await
     }
 
-    pub async fn fetch_latest_metamod_version(&self, branch: &Branch) -> Result<String, Error> {
-        let target = format!("https://mms.alliedmods.net/mmsdrop/{branch}/mmsource-latest-linux");
+    pub async fn fetch_latest_metamod_build(&self, branch: &Branch) -> Result<String, Error> {
+        let target = format!(
+            "https://mms.alliedmods.net/mmsdrop/{}/mmsource-latest-linux",
+            self.get_sdk_branch_version(&Runtime::Metamod, branch)
+        );
         reqwest::get(target).await?.text().await
     }
 
@@ -93,44 +117,58 @@ impl<'a> Manager<'a> {
         Ok(())
     }
 
-    async fn install_sourcemod(
+    fn ensure_cache_dir(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let cache_path = self.root.join(DL_CACHE);
+        if !cache_path.exists() {
+            std::fs::create_dir_all(&cache_path)?;
+        }
+        Ok(cache_path)
+    }
+
+    pub async fn install_sourcemod(
         &self,
         branch: &Branch,
         target_dir: &PathBuf,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("⏳ Fetching latest version... ");
-        let latest_version = Self::fetch_latest_sourcemod_version(self, &branch).await?;
+        let latest_version = Self::fetch_latest_sourcemod_build(self, &branch).await?;
         println!("🔎 Found: {latest_version}");
-        let archive_path = self.root.join(DL_CACHE).join(&latest_version);
+        let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
             let target = format!(
-                "https://sm.alliedmods.net/smdrop/{branch}/{}",
+                "https://sm.alliedmods.net/smdrop/{}/{}",
+                self.get_sdk_branch_version(&Runtime::Sourcemod, branch),
                 &latest_version
             );
-            println!("💾 Downlading sdk: {target}...");
+            println!("💾 Downlading sourcemod sdk: {target}...");
             let mut of = File::create(&archive_path)?;
             self.fetch_archive(target, &mut of).await?;
         }
 
         self.extract_archive(&archive_path, &target_dir)?;
-        self.activate_sdk(branch)?;
 
         Ok(())
     }
 
-    async fn install_metamod(
+    pub async fn install_metamod(
         &self,
         branch: &Branch,
         target_dir: &PathBuf,
     ) -> Result<(), Box<dyn std::error::Error>> {
         println!("⏳ Fetching latest version... ");
-        let version = Self::fetch_latest_sourcemod_version(self, branch).await?;
-        println!("🔎 Found: {version}");
-        let target = format!("https://sm.alliedmods.net/smdrop/{branch}/{version}");
-        println!("💾 Downlading sdk: {target}");
-        let archive_path = self.root.join(DL_CACHE).join(version);
-        let mut of = File::create(&archive_path)?;
-        self.fetch_archive(target, &mut of).await?;
+        let latest_version = Self::fetch_latest_metamod_build(self, &branch).await?;
+        println!("🔎 Found: {latest_version}");
+        let archive_path = self.ensure_cache_dir()?.join(&latest_version);
+        if !archive_path.exists() {
+            let target = format!(
+                "https://mms.alliedmods.net/mmsdrop/{}/{}",
+                self.get_sdk_branch_version(&Runtime::Metamod, branch),
+                &latest_version
+            );
+            println!("💾 Downlading metamod sdk: {target}...");
+            let mut of = File::create(&archive_path)?;
+            self.fetch_archive(target, &mut of).await?;
+        }
 
         self.extract_archive(&archive_path, &target_dir)?;
 
@@ -164,7 +202,10 @@ impl<'a> Manager<'a> {
     }
 
     pub fn activate_sdk(&self, branch: &Branch) -> Result<(), Box<dyn std::error::Error>> {
-        let wanted = self.root.join(format!("sdks/sourcemod-{branch}"));
+        let wanted = self.root.join(format!(
+            "sdks/sourcemod-{}",
+            self.get_sdk_branch_version(&Runtime::Sourcemod, branch)
+        ));
         let sdks = self.get_installed_sdks();
         if sdks.is_empty() {
             Err("No SDKs installed, try: sourcemod install".into())
