@@ -1,12 +1,12 @@
 use std::{
     fmt::Display,
-    fs::{self, create_dir_all, remove_dir_all},
+    fs::{self, create_dir_all},
     path::PathBuf,
 };
 
 use serde::Deserialize;
 
-use crate::{compiler, fsutil, repo::Repository};
+use crate::{fsutil, repo::Repository, sdk};
 
 /// Definition of a plugin.
 #[derive(Debug, Deserialize, Clone)]
@@ -30,84 +30,53 @@ impl Display for Definition {
         write!(f, "{}", self.name)
     }
 }
+pub fn build(
+    app_root: &PathBuf,
+    sdk_env: &sdk::Environment,
+    repo: &Repository,
+    plugins: &Vec<String>,
+) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut outputs = Vec::new();
+    for plugin in repo.find_plugin_definitions(&plugins)? {
+        let src_tree = app_root.join("repo").join(&plugin.name).join("src");
+        let build_dir = app_root.join("build").join(&plugin.name);
+        create_dir_all(&build_dir)?;
+
+        fsutil::copy_dir_all(src_tree, &build_dir)?;
+
+        let mut args = sdk_env.args();
+        args.active_dir = Some(build_dir.join("scripting"));
+        sdk_env.compile(&mut args, &plugin)?;
+        outputs.push(build_dir);
+    }
+
+    Ok(outputs)
+}
 
 pub fn install(
-    repo: Repository,
-    target: &PathBuf,
+    _app_root: &PathBuf,
+    sdk_env: &sdk::Environment,
+    repo: &Repository,
+    output_path: &PathBuf,
     plugins: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !fs::exists(target)? {
+    if !fs::exists(output_path)? {
         return Err("target path does not exist".into());
     };
 
     for plugin in repo.find_plugin_definitions(&plugins)? {
-        perform_install(&repo, &target, &plugin)?
+        install_plugin(&sdk_env, &plugin, &output_path)?
     }
     Ok(())
 }
 
-fn perform_install(
-    repo: &Repository,
-    repo_root: &PathBuf,
+fn install_plugin(
+    _builder: &sdk::Environment,
     _plugin: &Definition,
+    _output_path: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !fs::exists(repo_root)? {
-        return Err("target path does not exist".into());
-    }
-
-    repo.checkout_repo()?;
-
-    //fsutil::copy_dir_all(plugin.path(), repo_root)?;
+    // let source_dir = builder.build(&plugin)?;
+    // println!("Installing {}", plugin.name);
+    // fsutil::copy_dir_all(source_dir, output_path)?;
     Ok(())
-}
-
-pub struct Builder {
-    root: PathBuf,
-}
-
-impl Builder {
-    pub fn new(root: PathBuf) -> Self {
-        Self { root }
-    }
-
-    pub fn build(&self, plugin_def: Definition) -> Result<(), Box<dyn std::error::Error>> {
-        let build_root = self.setup_build_root(&plugin_def)?;
-        let mut args = compiler::CompilerArgs::default();
-        args.active_dir = Some(build_root.join("src/scripting"));
-
-        println!("🔨 Build root {:?}", args.active_dir);
-        compiler::compile(&mut args, &plugin_def)?;
-        Ok(())
-    }
-
-    // fn install(
-    //     &self,
-    //     plugin_def: &Definition,
-    //     target: &PathBuf,
-    // ) -> Result<(), Box<dyn std::error::Error>> {
-    //     Ok(())
-    // }
-
-    /// Setup a new clean build root containing the plugin sources. This wipes all
-    /// existing build artifacts from the plugins build root if it previous existed.
-    fn setup_build_root(
-        &self,
-        plugin_def: &Definition,
-    ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-        let build_root = self.build_root(&plugin_def);
-        if build_root.exists() {
-            remove_dir_all(&build_root)?;
-        }
-        create_dir_all(&build_root)?;
-        let src = self.root.join("repo").join(&plugin_def.name);
-        if !src.exists() {
-            return Err("plugin source directory does not exist?".into());
-        }
-        fsutil::copy_dir_all(src, &build_root)?;
-        Ok(build_root)
-    }
-
-    fn build_root(&self, plugin_def: &Definition) -> PathBuf {
-        self.root.join("build").join(plugin_def.name.to_lowercase())
-    }
 }

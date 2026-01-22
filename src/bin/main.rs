@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
 use sm_pkg::{
-    plugins, project, repo,
+    fsutil, plugins, project, repo,
     sdk::{self, Branch, Runtime},
 };
 use std::path::{Path, PathBuf};
@@ -28,13 +28,11 @@ enum Commands {
         #[arg(short, long, default_value = ".")]
         project_root: PathBuf,
     },
-
     #[command(about = "Install all project dependencies")]
     Install {
         #[arg(short, long, default_value = ".")]
         project_root: PathBuf,
     },
-
     #[command(about = "Add one or more plugins to a project")]
     Add {
         #[arg(short, long, default_value = ".")]
@@ -194,14 +192,17 @@ async fn project_init(project_root: &PathBuf) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 async fn package_install(
-    root_path: &PathBuf,
+    app_root: &PathBuf,
     project_root: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut project_manager = project::Manager::new(project_root.clone());
     project_manager.open()?;
+    let repo = repo::Repository::new(&app_root, UPDATE_URL);
     let package = project_manager.package.expect("No package found?");
+    let sdk_manager = sdk::Manager::new(&app_root);
+    let sdk_env = sdk_manager.get_sdk_env(&package.branch)?;
+    let outputs = plugins::build(&app_root, &sdk_env, &repo, &package.plugins)?;
 
-    let sdk_manager = sdk::Manager::new(&root_path);
     let mod_folder = project_root.join(&package.game.mod_folder());
     if !mod_folder.exists() {
         return Err(format!("Mod folder does not exist: {}", mod_folder.display()).into());
@@ -212,19 +213,27 @@ async fn package_install(
     sdk_manager
         .install_sourcemod(&package.branch, &mod_folder)
         .await?;
-    // for plugin in package.plugins {
-    //     build(project_root, &plugin.name).await?;
-    // }
+
+    let sm_root = mod_folder.join("addons").join("sourcemod");
+
+    for build_root in outputs {
+        println!("📀 Installing {:?} -> {:?}", &build_root, &sm_root);
+        fsutil::copy_dir_all(&build_root, &sm_root)?;
+    }
+
+    // plugins::install(&app_root, &sdk_env, &repo, &sm_root, package.plugins)?;
 
     //project_manager.install().await?;
     Ok(())
 }
 
-async fn build(root_path: &PathBuf, plugin: String) -> Result<(), Box<dyn std::error::Error>> {
-    let repo = repo::Repository::new(root_path, UPDATE_URL);
-    let plugin_def = repo.find_plugin_definition(&plugin)?;
-    let builder = plugins::Builder::new(root_path.clone());
-    builder.build(plugin_def)?;
+async fn build(_root_path: &PathBuf, _plugin: String) -> Result<(), Box<dyn std::error::Error>> {
+    // let repo = repo::Repository::new(root_path, UPDATE_URL);
+    // let mod_folder = project_root.join(&package.game.mod_folder());
+    // let sm_root = mod_folder.join("addons").join("sourcemod");
+    // let plugin_def = repo.find_plugin_definition(&plugin)?;
+    // let builder = plugins::Builder::new(root_path.clone());
+    // builder.build(&plugin_def)?;
 
     Ok(())
 }

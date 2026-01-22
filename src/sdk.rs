@@ -5,10 +5,13 @@ use std::{
     fmt::Display,
     fs::{File, create_dir_all, remove_file},
     io::Write,
-    os::unix::fs,
+    os::unix::fs::symlink,
     path::{self, PathBuf},
+    process::Command,
 };
 use tar::Archive;
+
+use crate::plugins;
 
 const DL_CACHE: &str = "dl_cache";
 
@@ -37,12 +40,12 @@ impl Display for Branch {
 
 pub struct Manager<'a> {
     /// The root directory
-    root: &'a PathBuf,
+    app_root: &'a PathBuf,
 }
 
 impl<'a> Manager<'a> {
-    pub fn new(root: &'a PathBuf) -> Self {
-        Manager { root }
+    pub fn new(app_root: &'a PathBuf) -> Self {
+        Manager { app_root }
     }
 
     pub async fn install_game_dir(
@@ -62,11 +65,12 @@ impl<'a> Manager<'a> {
         runtime: &Runtime,
         branch: &Branch,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let out_path = self.root.join(format!(
-            "sdks/sourcemod-{}",
+        let out_path = self.app_root.join(format!(
+            "{}/sdks/sourcemod-{}",
+            self.app_root.display(),
             self.get_sdk_branch_version(runtime, branch)
         ));
-        let cache_path = self.root.join(DL_CACHE);
+        let cache_path = self.app_root.join(DL_CACHE);
         if !cache_path.exists() {
             create_dir_all(&cache_path)?;
         }
@@ -91,6 +95,7 @@ impl<'a> Manager<'a> {
             },
         }
     }
+
     pub async fn fetch_latest_sourcemod_build(&self, branch: &Branch) -> Result<String, Error> {
         let target = format!(
             "https://sm.alliedmods.net/smdrop/{}/sourcemod-latest-linux",
@@ -118,7 +123,7 @@ impl<'a> Manager<'a> {
     }
 
     fn ensure_cache_dir(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
-        let cache_path = self.root.join(DL_CACHE);
+        let cache_path = self.app_root.join(DL_CACHE);
         if !cache_path.exists() {
             std::fs::create_dir_all(&cache_path)?;
         }
@@ -189,7 +194,7 @@ impl<'a> Manager<'a> {
 
     pub fn get_installed_sdks(&self) -> Vec<String> {
         let mut sdks = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(self.root.join("sdks")) {
+        if let Ok(entries) = std::fs::read_dir(self.app_root.join("sdks")) {
             for entry in entries.flatten() {
                 if let Some(name) = entry.file_name().to_str() {
                     if name.starts_with("sourcemod-") {
@@ -202,8 +207,9 @@ impl<'a> Manager<'a> {
     }
 
     pub fn activate_sdk(&self, branch: &Branch) -> Result<(), Box<dyn std::error::Error>> {
-        let wanted = self.root.join(format!(
-            "sdks/sourcemod-{}",
+        let wanted = self.app_root.join(format!(
+            "{}/sdks/sourcemod-{}",
+            self.app_root.display(),
             self.get_sdk_branch_version(&Runtime::Sourcemod, branch)
         ));
         let sdks = self.get_installed_sdks();
@@ -212,18 +218,18 @@ impl<'a> Manager<'a> {
         } else {
             let wanted_sdk = sdks
                 .iter()
-                .find(|p| wanted == self.root.join("sdks").join(path::Path::new(p)));
+                .find(|p| wanted == self.app_root.join("sdks").join(path::Path::new(p)));
             match wanted_sdk {
                 Some(latest_sdk) => {
-                    let sm_root = self.root.join("sdks").join(path::Path::new(latest_sdk));
-                    let current_root = self.root.join("sdks/current");
+                    let sm_root = self.app_root.join("sdks").join(path::Path::new(latest_sdk));
+                    let current_root = self.app_root.join("sdks/current");
                     println!("⭐ Activating {latest_sdk} @ {current_root:?}");
 
                     if current_root.exists() {
                         remove_file(&current_root)?;
                     }
 
-                    fs::symlink(sm_root, &current_root)?;
+                    symlink(sm_root, &current_root)?;
                     println!("✅ SDK activated successfully");
                     println!(
                         "🚨 You probably want to add {:?} to your $PATH if you have not already",
@@ -235,4 +241,272 @@ impl<'a> Manager<'a> {
             }
         }
     }
+
+    pub fn get_sdk_env(&self, branch: &Branch) -> Result<Environment, Box<dyn std::error::Error>> {
+        let wanted = self.app_root.join(format!(
+            "{}/sdks/sourcemod-{}",
+            self.app_root.display(),
+            self.get_sdk_branch_version(&Runtime::Sourcemod, branch)
+        ));
+
+        let sdks = self.get_installed_sdks();
+        if sdks.is_empty() {
+            return Err("No SDKs installed, try: sourcemod install".into());
+        } else {
+            let wanted_sdk = sdks
+                .iter()
+                .find(|p| wanted == self.app_root.join("sdks").join(path::Path::new(p)));
+            match wanted_sdk {
+                Some(path) => Ok(Environment::new(PathBuf::from(
+                    self.app_root.join("sdks").join(path),
+                ))),
+                None => Err("No SDK found for branch".into()),
+            }
+        }
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+const COMPILER_BIN: &str = "spcomp64";
+
+#[cfg(target_pointer_width = "32")]
+// Maybe still people using this since 32bit srcds is still everywhere?
+const COMPILER_BIN: &str = "spcomp";
+
+#[derive(Debug)]
+pub struct Environment {
+    sdk_root: PathBuf,
+}
+
+impl Environment {
+    pub fn new(sdk_root: PathBuf) -> Self {
+        Environment { sdk_root }
+    }
+
+    pub fn args(&self) -> CompilerArgs {
+        let mut args = CompilerArgs::new(&self.sdk_root);
+        args.include(
+            self.sdk_root
+                .join("addons")
+                .join("sourcemod")
+                .join("scripting")
+                .join("include"),
+        );
+        args
+    }
+
+    // Usage: spcomp64 [options] <filename> [filename...]
+    // optional arguments:
+    //   -D                        Active directory path
+    //   --active-dir=ACTIVE_DIR
+    //   -e                        Error file path
+    //   --error-file=ERROR_FILE
+    //   -E, --warnings-as-errors  Treat warnings as errors
+    //   -h, --show-includes       Show included file paths
+    //   -z
+    //   --compress-level=COMPRESS_LEVEL
+    //                             Compression level, default 9 (0=none, 1=worst,
+    //                             9=best)
+    //   -t, --tabsize=TABSIZE     TAB indent size (in character positions,
+    //                             default=8)
+    //   -v, --verbose=VERBOSE     Verbosity level; 0=quiet, 1=normal, 2=verbose
+    //   -p, --prefix=PREFIX       Set name of "prefix" file
+    //   -o, --output=OUTPUT       Set base name of (P-code) output file
+    //   -O, --opt-level=OPT_LEVEL
+    //                             Deprecated; has no effect
+    //   -i, --include=INCLUDE     Path for include files
+    //   -w, --warning=WARNING     Disable a specific warning by its number.
+    //   -;, --require-semicolons  Require a semicolon to end each statement.
+    //   --syntax-only             Perform a dry-run (No file output) on the input
+    //   --use-stderr              Use stderr instead of stdout for error messages.
+    //   --no-verify               Disable opcode verification (for debugging).
+    //   --show-stats              Show compiler statistics on exit.
+    //   sym=val                   Define macro "sym" with value "val".
+    //   sym=                      Define macro "sym" with value 0.
+    pub fn compile(
+        &self,
+        args: &mut CompilerArgs,
+        plugin_def: &plugins::Definition,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(inputs) = &plugin_def.inputs {
+            for input in inputs {
+                let mut out_bin = input.clone();
+                out_bin.set_extension("smx");
+
+                args.output = match &args.active_dir {
+                    Some(dir) => {
+                        let out_dir = dir.join("..").join("plugins");
+                        if !out_dir.exists() {
+                            create_dir_all(&out_dir)?;
+                        }
+
+                        Some(out_dir.join(&out_bin))
+                    }
+                    None => Some(PathBuf::from(&out_bin)),
+                };
+
+                let mut command = self.build_command(args);
+                command.arg(input);
+                // println!("Calling: {:?}", command);
+                print!("🔨 Compiling {:?} -> ", input);
+                match &args.output {
+                    Some(out) => println!("into {:?}", out),
+                    None => println!("into ."),
+                }
+
+                let output = command.output().expect("Failed to execute spcomp64");
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                match args.verbose.unwrap_or(0) {
+                    0 => (),
+                    _ => print!("{}", stdout),
+                }
+                if !stderr.is_empty() {
+                    print!("{}", stderr);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // build_command
+    fn build_command(&self, args: &CompilerArgs) -> Command {
+        let mut command = Command::new(
+            self.sdk_root
+                .join("addons")
+                .join("sourcemod")
+                .join("scripting")
+                .join(COMPILER_BIN),
+        );
+
+        if let Some(compress_level) = args.compress_level
+            && (compress_level >= 1 && compress_level <= 9)
+        {
+            command.arg("-z").arg(format!("{:?}", compress_level));
+        }
+        if let Some(tabsize) = args.tabsize {
+            command.arg("-t").arg(format!("{:?}", tabsize));
+        }
+        if let Some(error_file) = &args.error_file {
+            command.arg("-e").arg(error_file);
+        }
+        if let Some(verbose) = args.verbose
+            && (verbose == 1 || verbose == 2)
+        {
+            command.arg("-v").arg(format!("{:?}", verbose));
+        }
+        let mut tmp = args.active_dir.iter();
+        while let Some(active_dir) = tmp.next() {
+            command.arg("-D").arg(active_dir);
+        }
+        if let Some(prefix) = &args.prefix {
+            command.arg("-p").arg(prefix);
+        }
+        if let Some(output) = &args.output {
+            command.arg("-o").arg(output);
+        }
+        for include in &args.includes {
+            command.arg("-i").arg(include);
+        }
+        if args.warnings_as_error.unwrap_or(false) {
+            command.arg("-E");
+        }
+        if let Some(warnings) = &args.warnings {
+            for warning in warnings {
+                command.arg("-w").arg(warning);
+            }
+        };
+        if args.require_semicolons.unwrap_or(true) {
+            command.arg("--require-semicolons");
+        }
+        if args.syntax_only.unwrap_or(false) {
+            command.arg("--syntax-only");
+        }
+        if args.use_stderr.unwrap_or(false) {
+            command.arg("--use-stderr");
+        }
+        if args.no_verify.unwrap_or(false) {
+            command.arg("--no-verify");
+        }
+        if args.show_stats.unwrap_or(false) {
+            command.arg("--show-stats");
+        }
+        if args.show_includes.unwrap_or(false) {
+            command.arg("--show-includes");
+        }
+
+        command
+    }
+}
+pub struct CompilerArgs {
+    pub includes: Vec<PathBuf>,
+    pub warnings: Option<Vec<String>>,
+    pub use_stderr: Option<bool>,
+    pub show_stats: Option<bool>,
+    pub macro_defs: Vec<String>,
+    pub require_semicolons: Option<bool>,
+    pub syntax_only: Option<bool>,
+    pub no_verify: Option<bool>,
+    pub error_file: Option<PathBuf>,
+    pub active_dir: Option<PathBuf>,
+    pub warnings_as_error: Option<bool>,
+    pub show_includes: Option<bool>,
+    pub compress_level: Option<u8>,
+    pub output: Option<PathBuf>,
+    pub prefix: Option<String>,
+    pub tabsize: Option<u8>,
+    pub verbose: Option<u8>,
+}
+
+impl CompilerArgs {
+    pub fn include(&mut self, path: PathBuf) {
+        if !self.includes.contains(&path) {
+            self.includes.push(path.clone());
+        }
+    }
+}
+
+impl CompilerArgs {
+    pub fn new(sdk_root: &PathBuf) -> Self {
+        let mut args = CompilerArgs {
+            includes: Vec::new(),
+            warnings: Some(Vec::new()),
+            use_stderr: Some(true),
+            show_stats: Some(true),
+            macro_defs: Vec::new(),
+            require_semicolons: Some(true),
+            syntax_only: Some(false),
+            no_verify: Some(false),
+            error_file: None,
+            active_dir: None,
+            warnings_as_error: Some(true),
+            show_includes: Some(false),
+            compress_level: Some(9),
+            output: None,
+            prefix: None,
+            tabsize: Some(4),
+            verbose: Some(0),
+        };
+
+        match default_include_path(&sdk_root) {
+            Ok(include) => args.include(include),
+            Err(e) => eprintln!("Warn, cannot find default include path: {}", e),
+        }
+
+        args
+    }
+}
+
+fn default_include_path(sdk_path: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let include_path = sdk_path
+        .join("addons")
+        .join("sourcemod")
+        .join("scripting")
+        .join("include");
+    if !include_path.exists() {
+        return Err("Include directory not found".into());
+    }
+
+    Ok(include_path)
 }
