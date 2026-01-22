@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/package.json",
+  "$id": "https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/plugin.json",
   "title": "sm-pkg plugin definition",
   "type": "object",
   "properties": {
@@ -46,9 +46,5 @@
       }
     }
   },
-  "required": [
-    "name",
-    "description",
-    "version"
-  ]
+  "required": ["name", "description", "version"]
 }
