@@ -63,12 +63,6 @@ enum Commands {
     #[command(about = "Update package cache")]
     Update {},
 
-    #[command(about = "Build a plugin")]
-    Build {
-        #[arg(required = true)]
-        plugin: String,
-    },
-
     #[command(about = "Download and install sourcemod")]
     SDKInstall {
         #[arg(short, long, default_value_t, value_enum)]
@@ -118,7 +112,6 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Commands::SDKList {} => sdk_list(&app_root_resolved).await,
         Commands::Search { query } => search(&app_root_resolved, query).await,
         Commands::Update {} => update(&app_root_resolved).await,
-        Commands::Build { plugin } => build(&app_root_resolved, plugin).await,
         Commands::Init { project_root } => project_init(&project_root).await,
         Commands::Add {
             plugins,
@@ -224,17 +217,6 @@ async fn package_install(
     // plugins::install(&app_root, &sdk_env, &repo, &sm_root, package.plugins)?;
 
     //project_manager.install().await?;
-    Ok(())
-}
-
-async fn build(_root_path: &PathBuf, _plugin: String) -> Result<(), Box<dyn std::error::Error>> {
-    // let repo = repo::Repository::new(root_path, UPDATE_URL);
-    // let mod_folder = project_root.join(&package.game.mod_folder());
-    // let sm_root = mod_folder.join("addons").join("sourcemod");
-    // let plugin_def = repo.find_plugin_definition(&plugin)?;
-    // let builder = plugins::Builder::new(root_path.clone());
-    // builder.build(&plugin_def)?;
-
     Ok(())
 }
 

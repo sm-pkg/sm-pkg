@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/sm-pkg.json",
+  "title": "sm-pkg project definition",
+  "type": "object",
+  "properties": {
+    "game": {
+      "type": "string",
+      "description": "The name of the package",
+      "enum": ["TF"]
+    },
+    "branch": {
+      "type": "string",
+      "description": "SDK branch to use",
+      "enum": ["Dev", "Stable"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of plugins the project uses"
+      }
+    }
+  },
+  "required": ["game", "branch", "plugins"]
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/package.json",
+  "title": "sm-pkg plugin definition",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the package"
+    },
+    "homepage": {
+      "type": "string",
+      "description": "The homepage of the package"
+    },
+    "description": {
+      "type": "string",
+      "description": "Package description"
+    },
+    "license": {
+      "type": "string",
+      "description": "The license of the plugin"
+    },
+    "version": {
+      "type": "string",
+      "description": "The version of the package"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "The input files for the package"
+      }
+    },
+    "authors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of authors"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of dependencies"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "version"
+  ]
+}
