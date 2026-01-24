@@ -1,4 +1,4 @@
-use crate::{plugins, sdk::Branch};
+use crate::{plugins, sdk::Branch, template};
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,6 +41,7 @@ pub struct Package {
     pub game: Game,
     pub branch: Branch,
     pub plugins: Vec<String>,
+    pub configs: Vec<template::FileConfig>,
 }
 
 pub struct Manager {
@@ -144,10 +145,17 @@ impl Manager {
                 branch: branch?,
                 game: choice,
                 plugins: Vec::new(),
+                configs: Vec::new(),
             }),
             Err(_) => return Err("❗ Failed to select a game".into()),
         };
         self.save_package_config()?;
+        Ok(())
+    }
+
+    pub fn write_configs() -> Result<(), Box<dyn std::error::Error>> {
+        //let sm_config = template::create_sourcemod_cfg(overrides);
+
         Ok(())
     }
 }

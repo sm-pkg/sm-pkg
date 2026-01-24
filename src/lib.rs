@@ -3,3 +3,4 @@ pub mod plugins;
 pub mod project;
 pub mod repo;
 pub mod sdk;
+pub mod template;

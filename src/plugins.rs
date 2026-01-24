@@ -1,12 +1,15 @@
-use std::{
-    fmt::Display,
-    fs::{self, create_dir_all},
-    path::PathBuf,
-};
+use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
 
 use serde::Deserialize;
 
 use crate::{fsutil, repo::Repository, sdk};
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ConfigFile {
+    pub name: String,
+
+    pub values: collections::HashMap<String, String>,
+}
 
 /// Definition of a plugin.
 #[derive(Debug, Deserialize, Clone)]
@@ -23,6 +26,8 @@ pub struct Definition {
     pub dependencies: Option<Vec<String>>,
     /// The full path to the plugin's directory
     pub path: Option<PathBuf>,
+
+    pub configs: Option<Vec<ConfigFile>>,
 }
 
 impl Display for Definition {
@@ -30,6 +35,7 @@ impl Display for Definition {
         write!(f, "{}", self.name)
     }
 }
+
 pub fn build(
     app_root: &PathBuf,
     sdk_env: &sdk::Environment,
@@ -51,32 +57,4 @@ pub fn build(
     }
 
     Ok(outputs)
-}
-
-pub fn install(
-    _app_root: &PathBuf,
-    sdk_env: &sdk::Environment,
-    repo: &Repository,
-    output_path: &PathBuf,
-    plugins: Vec<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if !fs::exists(output_path)? {
-        return Err("target path does not exist".into());
-    };
-
-    for plugin in repo.find_plugin_definitions(&plugins)? {
-        install_plugin(&sdk_env, &plugin, &output_path)?
-    }
-    Ok(())
-}
-
-fn install_plugin(
-    _builder: &sdk::Environment,
-    _plugin: &Definition,
-    _output_path: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // let source_dir = builder.build(&plugin)?;
-    // println!("Installing {}", plugin.name);
-    // fsutil::copy_dir_all(source_dir, output_path)?;
-    Ok(())
 }
