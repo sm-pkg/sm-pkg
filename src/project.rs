@@ -3,18 +3,15 @@ use crate::{
     sdk::Branch,
     templates::{
         self, AdminGroupsCfg, AdminOverridesCfg, AdminsCfg, AdminsSimpleIni, CoreCfg, DatabasesCfg,
-        FileConfig, MaplistsCfg, SourcemodCfg,
+        MaplistsCfg, SourcemodCfg,
     },
 };
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
 use std::{
-    any::Any,
-    collections::HashMap,
     fmt::Display,
     fs::File,
-    io::Write,
     path::{self, PathBuf},
 };
 
@@ -58,7 +55,13 @@ pub struct Package {
 #[derive(Serialize, Deserialize)]
 pub struct ConfigArgs {
     pub sourcemod_cfg: Option<templates::SourcemodCfg>,
+    pub maplists_cfg: Option<templates::MaplistsCfg>,
+    pub databases_cfg: Option<templates::DatabasesCfg>,
+    pub core_cfg: Option<templates::CoreCfg>,
+    pub admins_simple_ini: Option<templates::AdminsSimpleIni>,
     pub admins_cfg: Option<templates::AdminsCfg>,
+    pub admin_groups_cfg: Option<templates::AdminGroupsCfg>,
+    pub admin_overrides_cfg: Option<templates::AdminOverridesCfg>,
 }
 
 pub struct Manager {
@@ -167,108 +170,130 @@ impl Manager {
     }
 
     pub fn write_configs(&self) -> BoxResult {
-        // let configs = match &self.package {
-        //     Some(config) => match &config.configs {
-        //         Some(configs) => configs,
-        //         None => &Vec::new(),
-        //     },
-        //     None => return Err("❗ No config?".into()),
-        // };
+        let configs = match &self.package {
+            Some(config) => match &config.configs {
+                Some(configs) => configs,
+                None => return Ok(()),
+            },
+            None => {
+                println!("⚠️ No configs were found, this is probably a mistake");
+                return Ok(());
+            }
+        };
 
-        // for file_config in configs {
-        //     self.handle_template(&file_config)?;
-        // }
+        self.write_sourcemod_cfg(&configs.sourcemod_cfg)?;
+        self.write_core_cfg(&configs.core_cfg)?;
+        self.write_databases_cfg(&configs.databases_cfg)?;
+        self.write_maplists_cfg(&configs.maplists_cfg)?;
+        self.write_admins_cfg(&configs.admins_cfg)?;
+        self.write_admin_groups_cfg(&configs.admin_groups_cfg)?;
+        self.write_admin_overrides_cfg(&configs.admin_overrides_cfg)?;
+        self.write_admins_simple_ini(&configs.admins_simple_ini)?;
 
         Ok(())
     }
 
-    fn handle_template(&self, file_config: &FileConfig) -> BoxResult {
-        let out_path = self.root.join(&file_config.path);
-        println!("Outpath: {}", out_path.to_str().unwrap());
-        let mut output_file = File::create(out_path)?;
-        match file_config.format {
-            templates::Format::CFG => self.handle_template_cfg(file_config, &mut output_file),
-            templates::Format::KV => self.handle_template_kv(file_config, &mut output_file),
-            templates::Format::TEMPLATE => {
-                self.handle_template_template(file_config, &mut output_file)
-            }
+    fn write_sourcemod_cfg(&self, config: &Option<SourcemodCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self.root.join("tf/cfg/sourcemod/sourcemod.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
         }
-    }
 
-    fn handle_template_cfg(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
-        // Write out raw section first, explicit options should override anything in there.
-        match &fc.raw {
-            Some(content) => output_file.write_all(content.as_bytes())?,
-            None => (),
-        };
-
-        match &fc.options {
-            Some(v) => {
-                for (key, value) in v {
-                    write!(output_file, "{} \"{}\"\n", key, value)?;
-                }
-                Ok(())
-            }
-            None => Ok(()),
-        }
-    }
-
-    fn handle_template_kv(&self, _fc: &FileConfig, _output_file: &mut File) -> BoxResult {
         Ok(())
     }
 
-    fn handle_template_template(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
-        let mut out_path = fc.path.clone();
-        out_path.add_extension("jinja2");
-        println!("Template: {:?}", out_path);
-        let out_path_buf = out_path.to_path_buf();
-        let _template_path = match out_path_buf.to_str() {
-            None => return Err("invalid  template path".into()),
-            Some(p) => p,
-        };
-        let template_key = match out_path_buf.to_str() {
-            None => return Err("invalid template key".into()),
-            Some(p) => p,
-        };
-        let mut values: HashMap<String, Box<dyn Any>> = HashMap::new();
-        if let Some(options) = &fc.options {
-            for (key, value) in &*options {
-                println!("{} {:?}", key, value);
-                values.insert(key.clone(), Box::new(value.clone()));
-            }
+    fn write_core_cfg(&self, config: &Option<CoreCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self.root.join("tf/addons/sourcemod/configs/core.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
         }
-
-        let rendered = match template_key {
-            "tf/cfg/sourcemod/sourcemod.cfg.jinja2" => {
-                SourcemodCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/core.cfg.jinja2" => {
-                CoreCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/maplists.cfg.jinja2" => {
-                MaplistsCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/admins_simple.ini.jinja2" => {
-                AdminsSimpleIni::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/admins.cfg.jinja2" => {
-                AdminsCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/admin_groups.cfg.jinja2" => {
-                AdminGroupsCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/databases.cfg.jinja2" => {
-                DatabasesCfg::default().render_with_values(&values)?
-            }
-            "tf/addons/sourcemod/configs/admin_overrides.cfg.jinja2" => {
-                AdminOverridesCfg::default().render_with_values(&values)?
-            }
-            _ => return Err("unknown template".into()),
-        };
-
-        write!(output_file, "{}", rendered)?;
-        println!("{}", rendered);
 
         Ok(())
     }
+
+    fn write_databases_cfg(&self, config: &Option<DatabasesCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self.root.join("tf/addons/sourcemod/configs/databases.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    fn write_maplists_cfg(&self, config: &Option<MaplistsCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self.root.join("tf/addons/sourcemod/configs/maplists.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    fn write_admins_simple_ini(&self, config: &Option<AdminsSimpleIni>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self
+                .root
+                .join("tf/addons/sourcemod/configs/admins_simple.ini");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    fn write_admins_cfg(&self, config: &Option<AdminsCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self.root.join("tf/addons/sourcemod/configs/admins.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    fn write_admin_groups_cfg(&self, config: &Option<AdminGroupsCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self
+                .root
+                .join("tf/addons/sourcemod/configs/admin_groups.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    fn write_admin_overrides_cfg(&self, config: &Option<AdminOverridesCfg>) -> BoxResult {
+        if let Some(template) = &config {
+            let path = self
+                .root
+                .join("tf/addons/sourcemod/configs/admin_overrides.cfg");
+            template.write_into(&mut File::create(&path)?)?;
+            println!("📝 Created {}", path.display());
+        }
+
+        Ok(())
+    }
+
+    // fn handle_template_cfg(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
+    //     // Write out raw section first, explicit options should override anything in there.
+    //     match &fc.raw {
+    //         Some(content) => output_file.write_all(content.as_bytes())?,
+    //         None => (),
+    //     };
+
+    //     match &fc.options {
+    //         Some(v) => {
+    //             for (key, value) in v {
+    //                 write!(output_file, "{} \"{}\"\n", key, value)?;
+    //             }
+    //             Ok(())
+    //         }
+    //         None => Ok(()),
+    //     }
+    // }
 }
