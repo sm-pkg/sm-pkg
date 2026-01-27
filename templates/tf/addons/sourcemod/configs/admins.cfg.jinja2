@@ -35,15 +35,17 @@
  */
 Admins
 {
-    {% for user in users %}
-    "{{ user.identity }}"
-    {
-        "auth"          "{{ user.auth }}"
-        "identity"      "{{ user.identity }}"
-        {% if user.password %}"password"      "{{ user.password }}"{% endif %}
-        {% if user.group %}"group"         "{{ user.group }}"{% endif %}
-        {% if user.flags %}"flags"         "{{ user.flags }}"{% endif %}
-        {% if user.immunity %}"immunity"    "{{ user.immunity }}"{% endif %}
-    }
+{% if let Some(valid) = users %}
+    {% for user in valid %}
+        "{{ user.identity }}"
+        {
+            "auth"          "{{ user.auth }}"
+            "identity"      "{{ user.identity }}"
+            {% if let Some(password) = user.password %}"password"      "{{ password }}"{% endif %}
+            {% if let Some(group) = user.group %}"group"         "{{ group }}"{% endif %}
+            {% if let Some(flags) = user.flags %}"flags"         "{{ flags }}"{% endif %}
+            {% if let Some(immunity) = user.immunity %}"immunity"    "{{ immunity }}"{% endif %}
+        }
     {% endfor %}
+{% endif %}
 }

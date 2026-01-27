@@ -1,34 +1,49 @@
 "Databases"
 {
-	"driver_default"		"{{ db_driver_default|default("mysql") }}"
+	"driver_default"		"{% if let Some(v) = driver_default %}{{ v }}{% else %}sqlite{% endif %}"
 
 	// When specifying "host", you may use an IP address, a hostname, or a socket file path
 
-	"default"
-	{
-		"driver"			"default"
-		"host"				"localhost"
-		"database"			"sourcemod"
-		"user"				"root"
-		"pass"				""
-		//"timeout"			"0"
-		//"port"			"0"
-	}
+{% if let Some(dbs) = databases %}
+    {% for db in dbs %}
+    "{{ db.name }}"
+    {
+        "database"			"{{ db.database }}"
+    {% if let Some(v) = db.driver %}"driver"			"{{v}}"{% endif %}
+    {% if let Some(v) = db.host %}"host"			"{{v}}"{% endif %}
+    {% if let Some(v) = db.port %}"port"			"{{v}}"{% endif %}
+    {% if let Some(v) = db.user %}"user"			"{{v}}"{% endif %}
+    {% if let Some(v) = db.pass %}"pass"			"{{v}}"{% endif %}
+    {% if let Some(v) = db.timeout %}"timeout"			"{{v}}"{% endif %}
+    }
+    {% endfor %}
+{% endif %}
 
-	"storage-local"
-	{
-		"driver"			"sqlite"
-		"database"			"sourcemod-local"
-	}
-
-	"clientprefs"
-	{
-		"driver"			"sqlite"
-		"host"				"localhost"
-		"database"			"clientprefs-sqlite"
-		"user"				"root"
-		"pass"				""
-		//"timeout"			"0"
-		//"port"			"0"
-	}
+	// 	"default"
+	// 	{
+	// 		"driver"			"default"
+	// 		"host"				"localhost"
+	// 		"database"			"sourcemod"
+	// 		"user"				"root"
+	// 		"pass"				""
+	// 		//"timeout"			"0"
+	// 		//"port"			"0"
+	// 	}
+	//
+	// 	"storage-local"
+	// 	{
+	// 		"driver"			"sqlite"
+	// 		"database"			"sourcemod-local"
+	// 	}
+	//
+	// 	"clientprefs"
+	// 	{
+	// 		"driver"			"sqlite"
+	// 		"host"				"localhost"
+	// 		"database"			"clientprefs-sqlite"
+	// 		"user"				"root"
+	// 		"pass"				""
+	// 		//"timeout"			"0"
+	// 		//"port"			"0"
+	// 	}
 }

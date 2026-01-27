@@ -17,5 +17,9 @@ Overrides
 	 *
 	 * You can make a command completely public by using an empty flag string.
 	 */
+{% if let Some(v) = overrides %}
+    {% for opt in v %}
+        "{{ opt.command }}"	"{{ opt.flags }}"
+    {% endfor %}
+{% endif %}
 }
-

@@ -1,11 +1,17 @@
 use crate::{
     BoxResult, plugins,
     sdk::Branch,
-    tmpl::{self, FileConfig},
+    templates::{
+        self, AdminGroupsCfg, AdminOverridesCfg, AdminsCfg, AdminsSimpleIni, CoreCfg, DatabasesCfg,
+        FileConfig, MaplistsCfg, SourcemodCfg,
+    },
 };
+use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
 use std::{
+    any::Any,
+    collections::HashMap,
     fmt::Display,
     fs::File,
     io::Write,
@@ -46,7 +52,13 @@ pub struct Package {
     pub game: Game,
     pub branch: Branch,
     pub plugins: Vec<String>,
-    pub configs: Option<Vec<tmpl::FileConfig>>,
+    pub configs: Option<ConfigArgs>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ConfigArgs {
+    pub sourcemod_cfg: Option<templates::SourcemodCfg>,
+    pub admins_cfg: Option<templates::AdminsCfg>,
 }
 
 pub struct Manager {
@@ -155,17 +167,17 @@ impl Manager {
     }
 
     pub fn write_configs(&self) -> BoxResult {
-        let configs = match &self.package {
-            Some(config) => match &config.configs {
-                Some(configs) => configs,
-                None => &Vec::new(),
-            },
-            None => return Err("❗ No config?".into()),
-        };
+        // let configs = match &self.package {
+        //     Some(config) => match &config.configs {
+        //         Some(configs) => configs,
+        //         None => &Vec::new(),
+        //     },
+        //     None => return Err("❗ No config?".into()),
+        // };
 
-        for file_config in configs {
-            self.handle_template(&file_config)?;
-        }
+        // for file_config in configs {
+        //     self.handle_template(&file_config)?;
+        // }
 
         Ok(())
     }
@@ -175,9 +187,11 @@ impl Manager {
         println!("Outpath: {}", out_path.to_str().unwrap());
         let mut output_file = File::create(out_path)?;
         match file_config.format {
-            tmpl::Format::CFG => self.handle_template_cfg(file_config, &mut output_file),
-            tmpl::Format::KV => self.handle_template_kv(file_config, &mut output_file),
-            tmpl::Format::TEMPLATE => self.handle_template_template(file_config, &mut output_file),
+            templates::Format::CFG => self.handle_template_cfg(file_config, &mut output_file),
+            templates::Format::KV => self.handle_template_kv(file_config, &mut output_file),
+            templates::Format::TEMPLATE => {
+                self.handle_template_template(file_config, &mut output_file)
+            }
         }
     }
 
@@ -203,7 +217,7 @@ impl Manager {
         Ok(())
     }
 
-    fn handle_template_template(&self, fc: &FileConfig, _output_file: &mut File) -> BoxResult {
+    fn handle_template_template(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
         let mut out_path = fc.path.clone();
         out_path.add_extension("jinja2");
         println!("Template: {:?}", out_path);
@@ -212,20 +226,48 @@ impl Manager {
             None => return Err("invalid  template path".into()),
             Some(p) => p,
         };
-        // println!("Template Path: {}", template_path);
-        // let tmpl = match self.env.get_template(template_path) {
-        //     Err(_) => return Err("Failed to load template".into()),
-        //     Ok(t) => t,
-        // };
+        let template_key = match out_path_buf.to_str() {
+            None => return Err("invalid template key".into()),
+            Some(p) => p,
+        };
+        let mut values: HashMap<String, Box<dyn Any>> = HashMap::new();
+        if let Some(options) = &fc.options {
+            for (key, value) in &*options {
+                println!("{} {:?}", key, value);
+                values.insert(key.clone(), Box::new(value.clone()));
+            }
+        }
 
-        // println!("{:?}", fc.options);
+        let rendered = match template_key {
+            "tf/cfg/sourcemod/sourcemod.cfg.jinja2" => {
+                SourcemodCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/core.cfg.jinja2" => {
+                CoreCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/maplists.cfg.jinja2" => {
+                MaplistsCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/admins_simple.ini.jinja2" => {
+                AdminsSimpleIni::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/admins.cfg.jinja2" => {
+                AdminsCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/admin_groups.cfg.jinja2" => {
+                AdminGroupsCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/databases.cfg.jinja2" => {
+                DatabasesCfg::default().render_with_values(&values)?
+            }
+            "tf/addons/sourcemod/configs/admin_overrides.cfg.jinja2" => {
+                AdminOverridesCfg::default().render_with_values(&values)?
+            }
+            _ => return Err("unknown template".into()),
+        };
 
-        // tmpl.render_to_write(fc.options.clone().unwrap(), output_file)?;
-
-        // println!(
-        //     "💾 Wrote template: {}",
-        //     fc.path.to_str().unwrap_or("unknown")
-        // );
+        write!(output_file, "{}", rendered)?;
+        println!("{}", rendered);
 
         Ok(())
     }

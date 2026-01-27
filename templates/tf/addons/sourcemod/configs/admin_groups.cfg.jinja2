@@ -5,32 +5,33 @@ Groups
 	 *
 	 *   "flags"           - Flag string.
 	 *   "immunity"        - Immunity level number, or a group name.
-	 *						 If the group name is a number, prepend it with an 
-	 *						 '@' symbol similar to admins_simple.ini.  Users 
-	 *						 will only inherit the level number if it's higher 
+	 *						 If the group name is a number, prepend it with an
+	 *						 '@' symbol similar to admins_simple.ini.  Users
+	 *						 will only inherit the level number if it's higher
 	 *						 than their current value.
 	 */
+{% if let Some(immunity) = default_immunity %}
 	"Default"
 	{
-		"immunity"		"1"
+		"immunity"		"{{ immunity }}"
 	}
-	
-	"Full Admins"
-	{
-		/**
-		 * You can override commands and command groups here.
-		 * Specify a command name or group and either "allow" or "deny"
-		 * Examples:
-		 * 		":CSDM"			"allow"
-		 *		"csdm_enable"	"deny"
-		 */
-		 Overrides
-		 {
-		 }
-		"flags"			"abcdefghiz"
+{% endif %}
 
-		/* Largish number for lots of in-between values. */
-		"immunity"		"99"
-	}
+{% if let Some(valid) = groups %}
+    {% for group in valid %}
+        "{{ group.name }}"
+        {
+        {% if let Some(overrides) = group.overrides %}
+            Overrides
+            {
+                {% for value in overrides %}
+                    "{{ value.command }}"	"{{ value.action }}"
+                {% endfor %}
+            }
+        {% endif %}
+        {% if let Some(flags) = group.flags %}"flags"			"{{ flags }}"{% endif %}
+        {% if let Some(immunity) = group.immunity %}"immunity"			"{{ immunity }}"{% endif %}
+        }
+    {% endfor %}
+{%endif %}
 }
-

@@ -10,7 +10,7 @@
 	 * "on"		- Logging is enabled (default)
 	 * "off"	- Logging is disabled
 	 */
-	"Logging"		"{{ core_logging|default("on") }}"
+	"Logging"		"{% if let Some(v) = core_logging %}{{ v }}{% else %}on{% endif %}"
 
 	/**
 	 * This option determines how SourceMod logging should be handled.
@@ -19,7 +19,7 @@
 	 * "map"	- New log file is created for each map change
 	 * "game"	- Use game's log files
 	 */
-	"LogMode"			"{{ core_log_mode|default("daily") }}"
+	"LogMode"			"{% if let Some(v) = core_log_mode %}{{ v }}{% else %}daily{% endif %}"
 
 	/**
 	 * This option determines the time format SourceMod logging should use.
@@ -28,7 +28,7 @@
 	 * You can specify any time format you want. See https://cplusplus.com/reference/ctime/strftime/ for a list of format parameters.
 	 * Example: "%d/%m/%Y - %H:%M:%S"
 	 */
-	"LogTimeFormat"		"{{ core_log_time_format|default("default") }}"
+	"LogTimeFormat"		"{% if let Some(v) = core_log_time_format %}{{ v }}{% else %}default{% endif %}"
 
 	/**
 	 * Language that multilingual enabled plugins and extensions will use to print messages.
@@ -36,17 +36,17 @@
 	 *
 	 * The default value is "en"
 	 */
-	"ServerLang"	"{{ core_server_lang|default("en") }}"
+	"ServerLang"	"{% if let Some(v) = core_server_lang %}{{ v }}{% else %}en{% endif %}"
 
 	/**
 	 * List of characters to use for public chat triggers.  Set an empty list to disable.
 	 */
-	"PublicChatTrigger"		"{{ core_public_chat_trigger|default("!") }}"
+	"PublicChatTrigger"		"{% if let Some(v) = core_public_chat_trigger %}{{ v }}{% else %}!{% endif %}"
 
 	/**
 	 * List of characters to use for silent chat triggers.  Set an empty list to disable.
 	 */
-	"SilentChatTrigger"		"{{ core_silent_chat_trigger|default("/") }}"
+	"SilentChatTrigger"	 "{% if let Some(v) = core_silent_chat_trigger %}{{ v }}{% else %}/{% endif %}"
 
 	/**
 	 * If a say command is a silent chat trigger, and is used by an admin,
@@ -55,13 +55,13 @@
 	 *
 	 * The default value is "no".  A value of "yes" will suppress.
 	 */
-	"SilentFailSuppress"	"{{ core_silent_fail_suppress|default("no") }}"
+	"SilentFailSuppress"	"{% if let Some(v) = core_silent_fail_suppress %}{{ v }}{% else %}no{% endif %}"
 
 	/**
 	 * Password setinfo key that clients must set.  You must change this in order for
 	 * passwords to work, for security reasons.
 	 */
-	"PassInfoVar"			"{{ core_pass_info_var|default("_password") }}"
+	"PassInfoVar"			"{% if let Some(v) = core_pass_info_var %}{{ v }}{% else %}_password{% endif %}"
 
 	/**
 	 * Enables or disables whether SourceMod reads a client's cl_language cvar to set
@@ -70,14 +70,14 @@
 	 * "on"		- Translate using the client's language (default)
 	 * "off"	- Translate using default server's language
 	 */
-	"AllowClLanguageVar"		"{{ core_allow_cl_language_var|default("on") }}"
+	"AllowClLanguageVar"	"{% if let Some(v) = core_allow_cl_language_var %}{{ v }}{% else %}on{% endif %}"
 
 	/**
 	 * Enables or Disables SourceMod's automatic gamedata updating.
 	 *
 	 * The default value is "no". A value of "yes" will block the Auto Updater.
 	 */
-	"DisableAutoUpdate"			"{{ core_disable_auto_update|default("no") }}"
+	"DisableAutoUpdate"			"{% if let Some(v) = core_disable_auto_update %}{{ v }}{% else %}no{% endif %}"
 
 	/**
 	 * If set to yes, a successful gamedata update will attempt to restart SourceMod.
@@ -85,19 +85,19 @@
 	 * Since gamedata updates occur when the server loads, impact should be minimal.
 	 * But to be safe, this option is disabled by default.
 	 */
-	"ForceRestartAfterUpdate"	"{{ core_force_restart_after_update|default("no") }}"
+	"ForceRestartAfterUpdate"	"{% if let Some(v) = core_force_restart_after_update %}{{ v }}{% else %}no{% endif %}"
 
 	/**
 	 * URL to use for retrieving update information.
 	 * SSL is not yet supported.
 	 */
-	"AutoUpdateURL"				"{{ core_auto_update_url|default("http://update.sourcemod.net/update/") }}"
+	"AutoUpdateURL"				"{% if let Some(v) = core_auto_update_url %}{{ v }}{% else %}http://update.sourcemod.net/update/{% endif %}"
 
 	/**
 	 * Whether to show debug spew.
 	 * Currently this will log details about the gamedata updating process.
 	 */
-	"DebugSpew"					"{{ core_debug_spew|default("no") }}"
+	"DebugSpew"					"{% if let Some(v) = core_debug_spew %}{{ v }}{% else %}no{% endif %}"
 
 	/**
 	 * If set to yes, SourceMod will validate steamid auth strings with the Steam backend before giving out admin access.
@@ -105,7 +105,7 @@
 	 * If Steam is down, admins will not be authenticated until Steam comes back up.
 	 * This option increases the security of your server, but is still experimental.
 	 */
-	"SteamAuthstringValidation"	"{{ core_steam_authstring_validation|default("yes") }}"
+	"SteamAuthstringValidation"	"{% if let Some(v) = core_steam_authstring_validation %}{{ v }}{% else %}yes{% endif %}"
 
 	/**
 	 * Enables or disables whether SourceMod blocks known or potentially malicious plugins from loading.
@@ -115,14 +115,14 @@
 	 * "yes"	- Block malware or illegal plugins from loading (default)
 	 * "no"		- Warn about malware or illegal plugins loading
 	 */
-	"BlockBadPlugins"	"{{ core_block_bad_plugins|default("yes") }}"
+	"BlockBadPlugins"	"{% if let Some(v) = core_block_bad_plugins %}{{ v }}{% else %}yes{% endif %}"
 
 	/**
 	 * If a plugin takes too long to execute, hanging or freezing the game server in the process,
 	 * SourceMod will attempt to terminate that plugin after the specified timeout length has
 	 * passed. You can disable this feature by setting the value to "0".
 	 */
-	"SlowScriptTimeout"	"{{ core_slow_script_timeout|default("8") }}"
+	"SlowScriptTimeout"	 "{% if let Some(v) = core_slow_script_timeout %}{{ v }}{% else %}8{% endif %}"
 
 	/**
 	 * Per "http://blog.counter-strike.net/index.php/server_guidelines/", certain plugin
@@ -135,7 +135,7 @@
 	 *
 	 * Disable this option at your own risk.
 	 */
-	"FollowCSGOServerGuidelines"	"{{ core_follow_csgo_server_guidelines|default("yes") }}"
+	"FollowCSGOServerGuidelines"	"{% if let Some(v) = core_follow_csgo_server_guidelines %}{{ v }}{% else %}yes{% endif %}"
 
 	/**
 	 * Controls whether the SourcePawn runtime will generate additional metadata about
@@ -146,12 +146,12 @@
 	 * "perf"    - Generate basic perf metadata (Linux only - function names)
 	 * "jitdump" - Generate extended perf metadata (Linux only - function names, bytecode, and source information)
 	 */
-	"JITMetadata"	"{{ core_jit_metadata|default("default") }}"
+	"JITMetadata"	"{% if let Some(v) = core_jit_metadata %}{{ v }}{% else %}default{% endif %}"
 
 	/**
 	 * Setup the SourcePawn VM to enable extensions to use a debugging API to step through
 	 * plugins line by line. This heavily decreases server performance and should NEVER be
 	 * used on a production server, but ONLY during plugin development.
 	 */
-	"EnableLineDebugging"	"{{ core_enable_line_debugging|default("no") }}"
+	"EnableLineDebugging"	"{% if let Some(v) = core_enable_line_debugging %}{{ v }}{% else %}no{% endif %}"
 }

@@ -24,7 +24,7 @@
 	 */
 	"default"
 	{
-		"target"		"mapcyclefile"
+		"target"		"{% if let Some(default_target) = default_target %}{{ default_target }}{% else %}mapcyclefile{% endif %}"
 	}
 
 	/* Admin menu, map menu */

@@ -43,6 +43,10 @@
 //
 ////////////////////////////////
 
-{% for user in users %}
-"{{ user.identity }}" "{{ user.permissions }}" {% if user.password %}"{{ user.password }}"{% endif %}
+{% if let Some(valid) = users %}
+
+{% for user in valid %}
+"{{ user.identity }}" "{% if let Some(immunity) = user.immunity %}{{ immunity }}:{% endif %}{{ user.flags }}" {% if let Some(password) = user.password %}"{{ password }}"{% endif %}
 {% endfor %}
+
+{% endif %}
