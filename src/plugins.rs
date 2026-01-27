@@ -1,13 +1,10 @@
-use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
-
+use crate::{BoxResult, fsutil, repo::Repository, sdk};
 use serde::Deserialize;
-
-use crate::{fsutil, repo::Repository, sdk};
+use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ConfigFile {
     pub name: String,
-
     pub values: collections::HashMap<String, String>,
 }
 
@@ -41,7 +38,7 @@ pub fn build(
     sdk_env: &sdk::Environment,
     repo: &Repository,
     plugins: &Vec<String>,
-) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+) -> BoxResult<Vec<PathBuf>> {
     let mut outputs = Vec::new();
     for plugin in repo.find_plugin_definitions(&plugins)? {
         let src_tree = app_root.join("repo").join(&plugin.name).join("src");

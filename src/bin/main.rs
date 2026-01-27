@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
 use sm_pkg::{
-    fsutil, plugins, project, repo,
+    BoxResult, fsutil, plugins, project, repo,
     sdk::{self, Branch, Runtime},
 };
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_ROOT: &str = "~/.sm-pkg";
 //const DEFAULT_OUTPUT: &str = "./output";
 const UPDATE_URL: &str =
-    "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.json";
+    "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.yaml";
 
 #[derive(Parser)]
 struct Cli {
@@ -86,11 +86,11 @@ enum Commands {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> BoxResult {
     run().await
 }
 
-pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run() -> BoxResult {
     println!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
     let app_root = args.app_root.expect("No app_root path specified");
@@ -128,13 +128,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn plugin_add(
-    app_root: &PathBuf,
-    project_root: &PathBuf,
-    plugins: Vec<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
     let repo = repo::Repository::new(app_root, UPDATE_URL);
-    let mut project_manager = project::Manager::new(project_root.clone());
+    let mut project_manager = project::Manager::new(project_root.clone())?;
     project_manager.open_or_new()?;
 
     for plugin in plugins {
@@ -147,11 +143,8 @@ async fn plugin_add(
     Ok(())
 }
 
-async fn package_list(
-    _app_root: &Path,
-    project_root: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pm = project::Manager::new(project_root.clone());
+async fn package_list(_app_root: &Path, project_root: &PathBuf) -> BoxResult {
+    let mut pm = project::Manager::new(project_root.clone())?;
     pm.open()?;
     match pm.package {
         None => return Err("❗ No package config found".into()),
@@ -174,37 +167,34 @@ async fn package_remove(
     _app_root: &Path,
     _project_root: &PathBuf,
     _plugins: Vec<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> BoxResult {
     Ok(())
 }
 
-async fn project_init(project_root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let mut project_manager = project::Manager::new(project_root.to_path_buf());
+async fn project_init(project_root: &PathBuf) -> BoxResult {
+    let mut project_manager = project::Manager::new(project_root.to_path_buf())?;
     project_manager.open_or_new()?;
 
     Ok(())
 }
-async fn package_install(
-    app_root: &PathBuf,
-    project_root: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut project_manager = project::Manager::new(project_root.clone());
+async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
+    let mut project_manager = project::Manager::new(project_root.clone())?;
     project_manager.open()?;
     let repo = repo::Repository::new(&app_root, UPDATE_URL);
-    let package = project_manager.package.expect("No package found?");
+    let project_config = project_manager.package.as_ref().expect("No package found?");
     let sdk_manager = sdk::Manager::new(&app_root);
-    let sdk_env = sdk_manager.get_sdk_env(&package.branch)?;
-    let outputs = plugins::build(&app_root, &sdk_env, &repo, &package.plugins)?;
+    let sdk_env = sdk_manager.get_sdk_env(&project_config.branch)?;
+    let outputs = plugins::build(&app_root, &sdk_env, &repo, &project_config.plugins)?;
 
-    let mod_folder = project_root.join(&package.game.mod_folder());
+    let mod_folder = project_root.join(&project_config.game.mod_folder());
     if !mod_folder.exists() {
         return Err(format!("Mod folder does not exist: {}", mod_folder.display()).into());
     }
     sdk_manager
-        .install_metamod(&package.branch, &mod_folder)
+        .install_metamod(&project_config.branch, &mod_folder)
         .await?;
     sdk_manager
-        .install_sourcemod(&package.branch, &mod_folder)
+        .install_sourcemod(&project_config.branch, &mod_folder)
         .await?;
 
     let sm_root = mod_folder.join("addons").join("sourcemod");
@@ -214,13 +204,12 @@ async fn package_install(
         fsutil::copy_dir_all(&build_root, &sm_root)?;
     }
 
-    // plugins::install(&app_root, &sdk_env, &repo, &sm_root, package.plugins)?;
+    project_manager.write_configs()?;
 
-    //project_manager.install().await?;
     Ok(())
 }
 
-async fn search(root_path: &Path, query: String) -> Result<(), Box<dyn std::error::Error>> {
+async fn search(root_path: &Path, query: String) -> BoxResult {
     let repo = repo::Repository::new(root_path, UPDATE_URL);
     let matches: Vec<plugins::Definition> = repo.search(&query)?;
     matches
@@ -229,14 +218,14 @@ async fn search(root_path: &Path, query: String) -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-async fn update(root_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn update(root_path: &Path) -> BoxResult {
     let repo = repo::Repository::new(root_path, UPDATE_URL);
     repo.update().await?;
     println!("Updated local package cache");
     Ok(())
 }
 
-async fn sdk_list(root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+async fn sdk_list(root: &PathBuf) -> BoxResult {
     let sdk = sdk::Manager::new(&root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk.get_installed_sdks();
@@ -246,11 +235,7 @@ async fn sdk_list(root: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn sdk_latest(
-    root: &PathBuf,
-    runtime: &Runtime,
-    branch: &Branch,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
     let manager = sdk::Manager::new(&root);
     let version = match runtime {
         Runtime::Metamod => manager.fetch_latest_metamod_build(&branch).await?,
@@ -261,10 +246,6 @@ async fn sdk_latest(
     Ok(())
 }
 
-async fn sdk_install(
-    root: &PathBuf,
-    runtime: &Runtime,
-    branch: &Branch,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn sdk_install(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
     sdk::Manager::new(&root).install_sdk(runtime, branch).await
 }

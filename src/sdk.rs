@@ -11,7 +11,7 @@ use std::{
 };
 use tar::Archive;
 
-use crate::plugins;
+use crate::{BoxResult, plugins};
 
 const DL_CACHE: &str = "dl_cache";
 
@@ -53,18 +53,14 @@ impl<'a> Manager<'a> {
         runtime: &Runtime,
         branch: &Branch,
         game_dir: &PathBuf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> BoxResult {
         match runtime {
             Runtime::Sourcemod => self.install_sourcemod(branch, &game_dir).await,
             Runtime::Metamod => self.install_metamod(branch, &game_dir).await,
         }
     }
 
-    pub async fn install_sdk(
-        &self,
-        runtime: &Runtime,
-        branch: &Branch,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn install_sdk(&self, runtime: &Runtime, branch: &Branch) -> BoxResult {
         let out_path = self.app_root.join(format!(
             "{}/sdks/sourcemod-{}",
             self.app_root.display(),
@@ -112,17 +108,13 @@ impl<'a> Manager<'a> {
         reqwest::get(target).await?.text().await
     }
 
-    async fn fetch_archive(
-        &self,
-        url: String,
-        of: &mut File,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn fetch_archive(&self, url: String, of: &mut File) -> BoxResult {
         let body = reqwest::get(url).await?.bytes().await?;
         of.write_all(&body[..])?;
         Ok(())
     }
 
-    fn ensure_cache_dir(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    fn ensure_cache_dir(&self) -> BoxResult<PathBuf> {
         let cache_path = self.app_root.join(DL_CACHE);
         if !cache_path.exists() {
             std::fs::create_dir_all(&cache_path)?;
@@ -130,11 +122,7 @@ impl<'a> Manager<'a> {
         Ok(cache_path)
     }
 
-    pub async fn install_sourcemod(
-        &self,
-        branch: &Branch,
-        target_dir: &PathBuf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn install_sourcemod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
         println!("⏳ Fetching latest version... ");
         let latest_version = Self::fetch_latest_sourcemod_build(self, &branch).await?;
         println!("🔎 Found: {latest_version}");
@@ -155,11 +143,7 @@ impl<'a> Manager<'a> {
         Ok(())
     }
 
-    pub async fn install_metamod(
-        &self,
-        branch: &Branch,
-        target_dir: &PathBuf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn install_metamod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
         println!("⏳ Fetching latest version... ");
         let latest_version = Self::fetch_latest_metamod_build(self, &branch).await?;
         println!("🔎 Found: {latest_version}");
@@ -180,11 +164,7 @@ impl<'a> Manager<'a> {
         Ok(())
     }
 
-    fn extract_archive(
-        &self,
-        archive_path: &PathBuf,
-        out_path: &PathBuf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn extract_archive(&self, archive_path: &PathBuf, out_path: &PathBuf) -> BoxResult {
         println!("📤 Extracting into: {:?}...", out_path);
         let input_archive = File::open(archive_path)?;
         let mut archive = Archive::new(GzDecoder::new(&input_archive));
@@ -206,7 +186,7 @@ impl<'a> Manager<'a> {
         sdks
     }
 
-    pub fn activate_sdk(&self, branch: &Branch) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn activate_sdk(&self, branch: &Branch) -> BoxResult {
         let wanted = self.app_root.join(format!(
             "{}/sdks/sourcemod-{}",
             self.app_root.display(),
@@ -242,7 +222,7 @@ impl<'a> Manager<'a> {
         }
     }
 
-    pub fn get_sdk_env(&self, branch: &Branch) -> Result<Environment, Box<dyn std::error::Error>> {
+    pub fn get_sdk_env(&self, branch: &Branch) -> BoxResult<Environment> {
         let wanted = self.app_root.join(format!(
             "{}/sdks/sourcemod-{}",
             self.app_root.display(),
@@ -323,11 +303,7 @@ impl Environment {
     //   --show-stats              Show compiler statistics on exit.
     //   sym=val                   Define macro "sym" with value "val".
     //   sym=                      Define macro "sym" with value 0.
-    pub fn compile(
-        &self,
-        args: &mut CompilerArgs,
-        plugin_def: &plugins::Definition,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn compile(&self, args: &mut CompilerArgs, plugin_def: &plugins::Definition) -> BoxResult {
         if let Some(inputs) = &plugin_def.inputs {
             for input in inputs {
                 let mut out_bin = input.clone();
@@ -498,7 +474,7 @@ impl CompilerArgs {
     }
 }
 
-fn default_include_path(sdk_path: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn default_include_path(sdk_path: &PathBuf) -> BoxResult<PathBuf> {
     let include_path = sdk_path
         .join("addons")
         .join("sourcemod")

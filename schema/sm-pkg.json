@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/sm-pkg.json",
   "title": "sm-pkg project definition",
   "type": "object",

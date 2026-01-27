@@ -1,13 +1,18 @@
-use crate::{plugins, sdk::Branch, template};
+use crate::{
+    BoxResult, plugins,
+    sdk::Branch,
+    tmpl::{self, FileConfig},
+};
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     fs::File,
+    io::Write,
     path::{self, PathBuf},
 };
 
-pub const PROJECT_FILE: &str = "sm-pkg.json";
+pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 
 // https://wiki.alliedmods.net/Required_Versions_%28SourceMod%29
 // https://github.com/alliedmodders/sourcemod/tree/master/gamedata/sdktools.games
@@ -41,7 +46,7 @@ pub struct Package {
     pub game: Game,
     pub branch: Branch,
     pub plugins: Vec<String>,
-    pub configs: Vec<template::FileConfig>,
+    pub configs: Option<Vec<tmpl::FileConfig>>,
 }
 
 pub struct Manager {
@@ -50,15 +55,15 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub fn new(root: path::PathBuf) -> Self {
+    pub fn new(root: path::PathBuf) -> BoxResult<Self> {
         println!("🏗️ Using project root {:?}", root);
-        Manager {
+        Ok(Manager {
             root,
             package: None,
-        }
+        })
     }
 
-    pub fn open_or_new(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn open_or_new(&mut self) -> BoxResult {
         match self.project_file_path().exists() {
             true => Some(self.existing_project()?),
             false => Some(self.create_package_config()?),
@@ -67,7 +72,7 @@ impl Manager {
         Ok(())
     }
 
-    pub fn open(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn open(&mut self) -> BoxResult {
         match self.project_file_path().exists() {
             true => Some(self.existing_project()?),
             false => {
@@ -86,13 +91,13 @@ impl Manager {
         self.root.join(PROJECT_FILE)
     }
 
-    pub fn save_package_config(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_package_config(&self) -> BoxResult {
         let config = match self.package {
             Some(ref config) => config,
             None => return Err("❗ No config?".into()),
         };
         let file = File::create(self.project_file_path())?;
-        serde_json::to_writer_pretty(file, &config)?;
+        serde_yaml::to_writer(file, &config)?;
 
         Ok(())
     }
@@ -106,10 +111,7 @@ impl Manager {
         }
     }
 
-    pub fn add_plugin(
-        &mut self,
-        plugin: plugins::Definition,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_plugin(&mut self, plugin: plugins::Definition) -> BoxResult {
         if self.has_plugin(&plugin.name) {
             return Err("❗ Plugin already exists".into());
         }
@@ -122,9 +124,9 @@ impl Manager {
         }
     }
 
-    fn existing_project(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn existing_project(&mut self) -> BoxResult {
         let file = File::open(self.project_file_path())?;
-        let existing_config: Package = serde_json::from_reader(file)?;
+        let existing_config: Package = serde_yaml::from_reader(file)?;
         println!(
             "🔎 Existing project found! (game: {:?})",
             existing_config.game.to_string()
@@ -133,11 +135,10 @@ impl Manager {
         Ok(())
     }
 
-    fn create_package_config(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_package_config(&mut self) -> BoxResult {
         let branch_opts = vec![Branch::Stable, Branch::Dev];
         let branch: Result<Branch, InquireError> =
             Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
-
         let options: Vec<Game> = vec![Game::TF, Game::HL2];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
         self.package = match game {
@@ -145,7 +146,7 @@ impl Manager {
                 branch: branch?,
                 game: choice,
                 plugins: Vec::new(),
-                configs: Vec::new(),
+                configs: None,
             }),
             Err(_) => return Err("❗ Failed to select a game".into()),
         };
@@ -153,8 +154,78 @@ impl Manager {
         Ok(())
     }
 
-    pub fn write_configs() -> Result<(), Box<dyn std::error::Error>> {
-        //let sm_config = template::create_sourcemod_cfg(overrides);
+    pub fn write_configs(&self) -> BoxResult {
+        let configs = match &self.package {
+            Some(config) => match &config.configs {
+                Some(configs) => configs,
+                None => &Vec::new(),
+            },
+            None => return Err("❗ No config?".into()),
+        };
+
+        for file_config in configs {
+            self.handle_template(&file_config)?;
+        }
+
+        Ok(())
+    }
+
+    fn handle_template(&self, file_config: &FileConfig) -> BoxResult {
+        let out_path = self.root.join(&file_config.path);
+        println!("Outpath: {}", out_path.to_str().unwrap());
+        let mut output_file = File::create(out_path)?;
+        match file_config.format {
+            tmpl::Format::CFG => self.handle_template_cfg(file_config, &mut output_file),
+            tmpl::Format::KV => self.handle_template_kv(file_config, &mut output_file),
+            tmpl::Format::TEMPLATE => self.handle_template_template(file_config, &mut output_file),
+        }
+    }
+
+    fn handle_template_cfg(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
+        // Write out raw section first, explicit options should override anything in there.
+        match &fc.raw {
+            Some(content) => output_file.write_all(content.as_bytes())?,
+            None => (),
+        };
+
+        match &fc.options {
+            Some(v) => {
+                for (key, value) in v {
+                    write!(output_file, "{} \"{}\"\n", key, value)?;
+                }
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
+    fn handle_template_kv(&self, _fc: &FileConfig, _output_file: &mut File) -> BoxResult {
+        Ok(())
+    }
+
+    fn handle_template_template(&self, fc: &FileConfig, _output_file: &mut File) -> BoxResult {
+        let mut out_path = fc.path.clone();
+        out_path.add_extension("jinja2");
+        println!("Template: {:?}", out_path);
+        let out_path_buf = out_path.to_path_buf();
+        let _template_path = match out_path_buf.to_str() {
+            None => return Err("invalid  template path".into()),
+            Some(p) => p,
+        };
+        // println!("Template Path: {}", template_path);
+        // let tmpl = match self.env.get_template(template_path) {
+        //     Err(_) => return Err("Failed to load template".into()),
+        //     Ok(t) => t,
+        // };
+
+        // println!("{:?}", fc.options);
+
+        // tmpl.render_to_write(fc.options.clone().unwrap(), output_file)?;
+
+        // println!(
+        //     "💾 Wrote template: {}",
+        //     fc.path.to_str().unwrap_or("unknown")
+        // );
 
         Ok(())
     }
