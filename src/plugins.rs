@@ -1,15 +1,15 @@
 use crate::{BoxResult, fsutil, repo::Repository, sdk};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConfigFile {
     pub name: String,
     pub values: collections::HashMap<String, String>,
 }
 
 /// Definition of a plugin.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Definition {
     /// Name of the plugin. Currently this must match the parent directory name in the repository.
     pub name: String,

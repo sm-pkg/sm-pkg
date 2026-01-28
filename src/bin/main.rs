@@ -4,7 +4,10 @@ use sm_pkg::{
     BoxResult, fsutil, plugins, project, repo,
     sdk::{self, Branch, Runtime},
 };
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{self, File},
+    path::{Path, PathBuf},
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_ROOT: &str = "~/.sm-pkg";
@@ -90,6 +93,8 @@ enum Commands {
         #[arg(short, long, default_value_t, value_enum)]
         runtime: Runtime,
     },
+    #[command(about = "Rebuild the package index in the local directory")]
+    BuildIndex {},
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -133,7 +138,33 @@ async fn run() -> BoxResult {
         Commands::Install { project_root } => {
             package_install(&app_root_resolved, &project_root).await
         }
+        Commands::BuildIndex {} => build_index().await,
     }
+}
+
+async fn build_index() -> BoxResult {
+    let mut specs: Vec<plugins::Definition> = vec![];
+    for name in fs::read_dir(".")? {
+        let fp = match name {
+            Err(_) => continue,
+            Ok(p) => p.path().join("plugin.yaml"),
+        };
+        if !fp.exists() {
+            continue;
+        }
+        let definition: plugins::Definition = serde_yaml::from_reader(File::open(fp)?)?;
+        specs.push(definition);
+    }
+
+    let mut output = File::create("index.yaml")?;
+    serde_yaml::to_writer(&mut output, &specs)?;
+
+    println!(
+        "✅ Package index built successfully. Found {} packages.",
+        specs.len()
+    );
+
+    Ok(())
 }
 
 async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
