@@ -1,10 +1,10 @@
 # sm-pkg
 
-Experiment in trying to build a "package manager" for sourcemod. 
+Experiment in trying to build a declarative "package manager" and configuration tool for sourcemod. 
 
 ## Implementation Ideas; Nothing Concrete; All Subject To Change
 
-Dont worry about complex dependency chains. The package depth is much more shallow compared to something like a OS.
+Dont worry about complex dependency chains. The package depth is much more shallow compared to something like a OS and the .
 
 Independent build roots. Each package has its own build root so its independent of other packages. This should allow
 some minial level of "play" as far as versions of dependencies. My thoughts are going to evolve on this as i play with
@@ -55,8 +55,8 @@ corresponding ini or kv files.
 ## Plugins
 
 The [plugins repository](https://github.com/sm-pkg/plugins) contains the source to all of the available core plugins. Each plugin
-contains a `package.json` file which describes the plugin and its dependencies. The actual plugin code is located in the `src` directory.
-These are kept separate from the `package.json` file to make it easier to manage the source code and prevent any potential conflicts from
+contains a `plugin.yaml` file which describes the plugin and its dependencies. The actual plugin code is located in the `src` directory.
+These are kept separate from the `plugin.yaml` file to make it easier to manage the source code and prevent any potential conflicts from
 the upstream source trees.
 
 ## Commands

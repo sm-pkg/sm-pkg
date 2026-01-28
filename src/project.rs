@@ -1,11 +1,4 @@
-use crate::{
-    BoxResult, plugins,
-    sdk::Branch,
-    templates::{
-        self, AdminGroupsCfg, AdminOverridesCfg, AdminsCfg, AdminsSimpleIni, CoreCfg, DatabasesCfg,
-        MaplistsCfg, SourcemodCfg,
-    },
-};
+use crate::{BoxResult, plugins, sdk, templates};
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
@@ -47,13 +40,13 @@ impl Display for Game {
 #[derive(Serialize, Deserialize)]
 pub struct Package {
     pub game: Game,
-    pub branch: Branch,
+    pub branch: sdk::Branch,
     pub plugins: Vec<String>,
-    pub configs: Option<ConfigArgs>,
+    pub templates: Option<TemplateSet>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ConfigArgs {
+pub struct TemplateSet {
     pub sourcemod_cfg: Option<templates::SourcemodCfg>,
     pub maplists_cfg: Option<templates::MaplistsCfg>,
     pub databases_cfg: Option<templates::DatabasesCfg>,
@@ -64,7 +57,9 @@ pub struct ConfigArgs {
     pub admin_overrides_cfg: Option<templates::AdminOverridesCfg>,
 }
 
+/// Manager is responsible for loading and managing a project using its package configuration file, sm-pkg.yaml.
 pub struct Manager {
+    /// Root directory of the project.
     pub root: path::PathBuf,
     pub package: Option<Package>,
 }
@@ -151,8 +146,8 @@ impl Manager {
     }
 
     fn create_package_config(&mut self) -> BoxResult {
-        let branch_opts = vec![Branch::Stable, Branch::Dev];
-        let branch: Result<Branch, InquireError> =
+        let branch_opts = vec![sdk::Branch::Stable, sdk::Branch::Dev];
+        let branch: Result<sdk::Branch, InquireError> =
             Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
         let options: Vec<Game> = vec![Game::TF, Game::HL2];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
@@ -161,7 +156,7 @@ impl Manager {
                 branch: branch?,
                 game: choice,
                 plugins: Vec::new(),
-                configs: None,
+                templates: None,
             }),
             Err(_) => return Err("❗ Failed to select a game".into()),
         };
@@ -171,7 +166,7 @@ impl Manager {
 
     pub fn write_configs(&self) -> BoxResult {
         let configs = match &self.package {
-            Some(config) => match &config.configs {
+            Some(config) => match &config.templates {
                 Some(configs) => configs,
                 None => return Ok(()),
             },
@@ -193,7 +188,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_sourcemod_cfg(&self, config: &Option<SourcemodCfg>) -> BoxResult {
+    fn write_sourcemod_cfg(&self, config: &Option<templates::SourcemodCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self.root.join("tf/cfg/sourcemod/sourcemod.cfg");
             template.write_into(&mut File::create(&path)?)?;
@@ -203,7 +198,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_core_cfg(&self, config: &Option<CoreCfg>) -> BoxResult {
+    fn write_core_cfg(&self, config: &Option<templates::CoreCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self.root.join("tf/addons/sourcemod/configs/core.cfg");
             template.write_into(&mut File::create(&path)?)?;
@@ -213,7 +208,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_databases_cfg(&self, config: &Option<DatabasesCfg>) -> BoxResult {
+    fn write_databases_cfg(&self, config: &Option<templates::DatabasesCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self.root.join("tf/addons/sourcemod/configs/databases.cfg");
             template.write_into(&mut File::create(&path)?)?;
@@ -223,7 +218,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_maplists_cfg(&self, config: &Option<MaplistsCfg>) -> BoxResult {
+    fn write_maplists_cfg(&self, config: &Option<templates::MaplistsCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self.root.join("tf/addons/sourcemod/configs/maplists.cfg");
             template.write_into(&mut File::create(&path)?)?;
@@ -233,7 +228,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_admins_simple_ini(&self, config: &Option<AdminsSimpleIni>) -> BoxResult {
+    fn write_admins_simple_ini(&self, config: &Option<templates::AdminsSimpleIni>) -> BoxResult {
         if let Some(template) = &config {
             let path = self
                 .root
@@ -245,7 +240,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_admins_cfg(&self, config: &Option<AdminsCfg>) -> BoxResult {
+    fn write_admins_cfg(&self, config: &Option<templates::AdminsCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self.root.join("tf/addons/sourcemod/configs/admins.cfg");
             template.write_into(&mut File::create(&path)?)?;
@@ -255,7 +250,7 @@ impl Manager {
         Ok(())
     }
 
-    fn write_admin_groups_cfg(&self, config: &Option<AdminGroupsCfg>) -> BoxResult {
+    fn write_admin_groups_cfg(&self, config: &Option<templates::AdminGroupsCfg>) -> BoxResult {
         if let Some(template) = &config {
             let path = self
                 .root
@@ -267,7 +262,10 @@ impl Manager {
         Ok(())
     }
 
-    fn write_admin_overrides_cfg(&self, config: &Option<AdminOverridesCfg>) -> BoxResult {
+    fn write_admin_overrides_cfg(
+        &self,
+        config: &Option<templates::AdminOverridesCfg>,
+    ) -> BoxResult {
         if let Some(template) = &config {
             let path = self
                 .root

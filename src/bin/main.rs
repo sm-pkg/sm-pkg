@@ -49,6 +49,13 @@ enum Commands {
         #[arg(required = true)]
         plugins: Vec<String>,
     },
+
+    #[command(about = "Generate configuration files")]
+    Config {
+        #[arg(short, long, default_value = ".")]
+        project_root: PathBuf,
+    },
+
     #[command(about = "List configured project pacakges")]
     List {
         #[arg(short, long, default_value = ".")]
@@ -90,7 +97,7 @@ async fn main() -> BoxResult {
     run().await
 }
 
-pub async fn run() -> BoxResult {
+async fn run() -> BoxResult {
     println!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
     let app_root = args.app_root.expect("No app_root path specified");
@@ -113,6 +120,7 @@ pub async fn run() -> BoxResult {
         Commands::Search { query } => search(&app_root_resolved, query).await,
         Commands::Update {} => update(&app_root_resolved).await,
         Commands::Init { project_root } => project_init(&project_root).await,
+        Commands::Config { project_root } => project_config(&project_root).await,
         Commands::Add {
             plugins,
             project_root,
@@ -177,6 +185,13 @@ async fn project_init(project_root: &PathBuf) -> BoxResult {
 
     Ok(())
 }
+
+async fn project_config(project_root: &PathBuf) -> BoxResult {
+    let mut project_manager = project::Manager::new(project_root.to_path_buf())?;
+    project_manager.open()?;
+    project_manager.write_configs()
+}
+
 async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
     let mut project_manager = project::Manager::new(project_root.clone())?;
     project_manager.open()?;

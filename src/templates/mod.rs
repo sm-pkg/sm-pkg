@@ -77,25 +77,25 @@ pub struct SourcemodCfg {
 #[derive(Template, Serialize, Deserialize, Debug)]
 #[template(path = "tf/addons/sourcemod/configs/core.cfg.jinja2", ext = "txt")]
 pub struct CoreCfg {
-    pub core_logging: Option<OnOffBool>,
-    pub core_log_mode: Option<String>,
-    pub core_log_time_format: Option<String>,
-    pub core_server_lang: Option<String>,
-    pub core_public_chat_trigger: Option<String>,
-    pub core_silent_chat_trigger: Option<String>,
-    pub core_silent_fail_suppress: Option<YesNoBool>,
-    pub core_pass_info_var: Option<String>,
-    pub core_allow_cl_language_var: Option<OnOffBool>,
-    pub core_disable_auto_update: Option<YesNoBool>,
-    pub core_force_restart_after_update: Option<YesNoBool>,
-    pub core_auto_update_url: Option<String>,
-    pub core_debug_spew: Option<YesNoBool>,
-    pub core_steam_authstring_validation: Option<YesNoBool>,
-    pub core_block_bad_plugins: Option<YesNoBool>,
-    pub core_slow_script_timeout: Option<u32>,
-    pub core_follow_csgo_server_guidelines: Option<YesNoBool>,
-    pub core_jit_metadata: Option<String>,
-    pub core_enable_line_debugging: Option<YesNoBool>,
+    pub logging: Option<OnOffBool>,
+    pub log_mode: Option<String>,
+    pub log_time_format: Option<String>,
+    pub server_lang: Option<String>,
+    pub public_chat_trigger: Option<String>,
+    pub silent_chat_trigger: Option<String>,
+    pub silent_fail_suppress: Option<YesNoBool>,
+    pub pass_info_var: Option<String>,
+    pub allow_cl_language_var: Option<OnOffBool>,
+    pub disable_auto_update: Option<YesNoBool>,
+    pub force_restart_after_update: Option<YesNoBool>,
+    pub auto_update_url: Option<String>,
+    pub debug_spew: Option<YesNoBool>,
+    pub steam_authstring_validation: Option<YesNoBool>,
+    pub block_bad_plugins: Option<YesNoBool>,
+    pub slow_script_timeout: Option<u32>,
+    pub follow_csgo_server_guidelines: Option<YesNoBool>,
+    pub jit_metadata: Option<String>,
+    pub enable_line_debugging: Option<YesNoBool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -107,7 +107,7 @@ pub struct SourcemodDatabase {
     pub port: Option<u16>,
     pub user: Option<String>,
     pub pass: Option<String>,
-    pub timeout: Option<String>,
+    pub timeout: Option<u32>,
 }
 
 #[derive(Template, Serialize, Deserialize)]
@@ -128,7 +128,7 @@ pub struct SourcemodSimpleAdmin {
     pub identity: String,
     pub password: Option<String>,
     pub flags: String,
-    pub immunity: Option<String>,
+    pub immunity: Option<u8>,
 }
 
 #[derive(Template, Serialize, Deserialize)]
@@ -142,20 +142,17 @@ pub struct AdminsSimpleIni {
 
 #[derive(Serialize, Deserialize)]
 pub struct SourcemodAdmin {
+    pub name: String,
     pub auth: String,
     pub identity: String,
     pub password: Option<String>,
     pub group: Option<String>,
     pub flags: Option<String>,
-    pub immunity: Option<String>,
+    pub immunity: Option<u8>,
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(
-    path = "tf/addons/sourcemod/configs/admins.cfg.jinja2",
-    ext = "txt",
-    escape = "none"
-)]
+#[template(path = "tf/addons/sourcemod/configs/admins.cfg.jinja2", ext = "txt")]
 pub struct AdminsCfg {
     pub users: Option<Vec<SourcemodAdmin>>,
 }
@@ -170,7 +167,7 @@ pub struct Override {
 pub struct AdminGroup {
     pub name: String,
     pub flags: Option<String>,
-    pub immunity: Option<String>,
+    pub immunity: Option<u8>,
     pub overrides: Option<Vec<Override>>,
 }
 

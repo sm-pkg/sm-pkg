@@ -37,7 +37,7 @@ Admins
 {
 {% if let Some(valid) = users %}
     {% for user in valid %}
-        "{{ user.identity }}"
+        "{{ user.name }}"
         {
             "auth"          "{{ user.auth }}"
             "identity"      "{{ user.identity }}"
