@@ -6,7 +6,7 @@ on:
   push:
     # run only against tags
     tags:
-      - "*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
@@ -15,17 +15,14 @@ permissions:
   # id-token: write
 
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

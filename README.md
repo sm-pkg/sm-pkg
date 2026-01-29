@@ -62,29 +62,27 @@ the upstream source trees.
 ## Commands
 
 ```
-Usage: main [OPTIONS] <COMMAND>
+Usage: sm-pkg [OPTIONS] <COMMAND>
 
 Commands:
   init         Initialize a new project
+  install      Install all project dependencies
   add          Add one or more plugins to a project
   remove       Remove one or more plugins from a project
+  config       Generate configuration files
   list         List configured project pacakges
   search       Search package cache
   update       Update package cache
-  build        Build a plugin
   sdk-install  Download and install sourcemod
   sdk-list     List installed sourcemod versions
   sdk-latest   Fetches the latest version of sourcemod for a branch
+  build-index  Rebuild the package index in the local directory
   help         Print this message or the help of the given subcommand(s)
 
 Options:
   -a, --app-root <APP_ROOT>  [default: ~/.sm-pkg]
   -h, --help                 Print help
 ```
-
-# Run
-
-$ cargo run -- sourcemod install 1.13
 
 # Previous work
 
