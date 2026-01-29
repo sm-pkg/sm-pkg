@@ -9,6 +9,10 @@ authors = [
     "Leigh MacDonald <leigh.macdonald@gmail.com>"
 ]
 
+[[bin]]
+name = "sm-pkg"
+path = "src/bin/main.rs"
+
 [dependencies]
 archive = "0.3.0"
 askama ="0.15.1"
