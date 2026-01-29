@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
 use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil, plugins, project,
-    repo::{self, UPDATE_URL},
+    repo::{self},
     sdk::{self, Branch, Runtime},
 };
 use std::{
@@ -165,7 +165,7 @@ async fn build_index() -> BoxResult {
 }
 
 async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
-    let repo = repo::Repository::new(app_root, repo::UPDATE_URL);
+    let repo = repo::LocalRepo::new(app_root);
     let mut project_manager = project::Project::new(project_root.clone())?;
     project_manager.open_or_new()?;
 
@@ -218,7 +218,7 @@ async fn project_config(project_root: &PathBuf) -> BoxResult {
 async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
     let mut project_manager = project::Project::new(project_root.clone())?;
     project_manager.open()?;
-    let repo = repo::Repository::new(&app_root, UPDATE_URL);
+    let repo = repo::LocalRepo::new(&app_root);
     let project_config = project_manager.package.as_ref().expect("No package found?");
     let sdk_manager = sdk::Manager::new(&app_root);
     let sdk_env = sdk_manager.get_sdk_env(&project_config.branch)?;
@@ -246,7 +246,7 @@ async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResul
 }
 
 async fn search(root_path: &Path, query: String) -> BoxResult {
-    let repo = repo::Repository::new(root_path, UPDATE_URL);
+    let repo = repo::LocalRepo::new(root_path);
     let matches: Vec<plugins::Definition> = repo.search(&query)?;
     matches
         .into_iter()
@@ -255,7 +255,7 @@ async fn search(root_path: &Path, query: String) -> BoxResult {
 }
 
 async fn update(root_path: &Path) -> BoxResult {
-    let repo = repo::Repository::new(root_path, UPDATE_URL);
+    let repo = repo::LocalRepo::new(root_path);
     repo.update().await?;
     println!("✅ Updated local package cache");
     Ok(())

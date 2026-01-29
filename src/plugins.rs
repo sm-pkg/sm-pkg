@@ -1,4 +1,4 @@
-use crate::{BoxResult, fsutil, repo::Repository, sdk};
+use crate::{BoxResult, fsutil, repo::LocalRepo, sdk};
 use serde::{Deserialize, Serialize};
 use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
 
@@ -38,7 +38,7 @@ impl Display for Definition {
 pub fn build(
     app_root: &PathBuf,
     sdk_env: &sdk::Environment,
-    repo: &Repository,
+    repo: &LocalRepo,
     plugins: &Vec<String>,
 ) -> BoxResult<Vec<PathBuf>> {
     let mut outputs = Vec::new();

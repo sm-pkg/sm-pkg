@@ -1,28 +1,26 @@
-use git2;
-use std::{fs::File, io::Write, path::Path};
-
 use crate::{BoxResult, plugins};
+use archive::{ArchiveExtractor, ArchiveFormat};
+use std::{
+    fs::{File, create_dir_all, remove_dir_all, write},
+    path::{Path, PathBuf},
+};
 
-const REPO_URL: &str = "https://github.com/sm-pkg/plugins";
+const REPO_URL: &str = "https://github.com/sm-pkg/plugins/archive/refs/heads/master.zip";
 pub const UPDATE_URL: &str =
     "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.yaml";
 pub const INDEX_FILE: &str = "index.yaml";
 
-pub struct Repository<'a> {
-    url: &'a str,
+pub struct LocalRepo<'a> {
     root: &'a Path,
 }
 
-impl<'a> Repository<'a> {
-    pub fn new(root: &'a Path, url: &'a str) -> Self {
-        Repository { url, root }
+impl<'a> LocalRepo<'a> {
+    pub fn new(root: &'a Path) -> Self {
+        LocalRepo { root }
     }
 
     pub async fn update(&self) -> BoxResult {
-        let body = reqwest::get(self.url).await?.bytes().await?;
-        let mut file = File::create(self.root.join(INDEX_FILE))?;
-        file.write_all(&body[..])?;
-        self.checkout_repo()?;
+        self.checkout_repo().await?;
 
         Ok(())
     }
@@ -59,48 +57,30 @@ impl<'a> Repository<'a> {
     // git clone --no-checkout --depth=1 --filter=tree:0 git@github.com:sm-pkg/plugins plugins
     // git sparse-checkout set --no-cone /connect
     // git checkout
-    pub fn checkout_repo(&self) -> BoxResult {
-        let build_root = self.root_dir().join("repo");
-        let path = build_root.as_path();
+    pub async fn checkout_repo(&self) -> BoxResult {
+        let out_root = self.root_dir().join("repo");
+        println!("📢 Downloading repo snapshot");
+        let body = reqwest::get(REPO_URL).await?.bytes().await?;
+        println!("✅ Successfully downloaded");
 
-        if !path.exists() {
-            match git2::Repository::clone(REPO_URL, path) {
-                Ok(repo) => repo,
-                Err(e) => panic!("failed to clone: {}", e),
-            };
-        } else {
-            let repo = match git2::Repository::open(path) {
-                Ok(repo) => repo,
-                Err(e) => panic!("failed to open: {}", e),
-            };
-
-            let remote_name = "origin";
-            let mut remote = repo
-                .find_remote(remote_name)
-                .expect("Failed to find remote");
-
-            let mut callbacks = git2::RemoteCallbacks::new();
-            callbacks.credentials(|_url, _username_from_url, _allowed_types| git2::Cred::default());
-
-            let mut fetch_options = Some(git2::FetchOptions::new());
-            fetch_options.as_mut().unwrap().remote_callbacks(callbacks);
-
-            // Fetch all remote branches
-            remote
-                .fetch(
-                    &["refs/heads/*:refs/remotes/origin/*"],
-                    fetch_options.as_mut(),
-                    None,
-                )
-                .expect("Failed to fetch");
-
-            let oid = repo.refname_to_id("refs/remotes/origin/master")?;
-            let object = repo.find_object(oid, None).unwrap();
-            repo.reset(&object, git2::ResetType::Hard, None)?;
-            println!("✅ Repo update complete");
+        if out_root.exists() {
+            remove_dir_all(&out_root)?;
         }
 
-        println!("📥 Checking out into {}", path.display());
+        create_dir_all(&out_root)?;
+
+        let extractor = ArchiveExtractor::new();
+        let files = extractor.extract(&body, ArchiveFormat::Zip)?;
+        for file in files {
+            let archive_path = PathBuf::from(&file.path);
+            let dest_path = out_root.join(archive_path.strip_prefix("plugins-master")?);
+            if file.is_directory {
+                create_dir_all(&dest_path)?;
+                println!("📝 {}", dest_path.display());
+            } else {
+                write(&dest_path, &file.data)?;
+            }
+        }
 
         Ok(())
     }
