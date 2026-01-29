@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
 use sm_pkg::{
-    BoxResult, fsutil, plugins, project, repo,
+    BoxResult, DEFAULT_ROOT, VERSION, fsutil, plugins, project,
+    repo::{self, UPDATE_URL},
     sdk::{self, Branch, Runtime},
 };
 use std::{
@@ -9,11 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-const DEFAULT_ROOT: &str = "~/.sm-pkg";
 //const DEFAULT_OUTPUT: &str = "./output";
-const UPDATE_URL: &str =
-    "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.yaml";
 
 #[derive(Parser)]
 struct Cli {
@@ -147,7 +144,7 @@ async fn build_index() -> BoxResult {
     for name in fs::read_dir(".")? {
         let fp = match name {
             Err(_) => continue,
-            Ok(p) => p.path().join("plugin.yaml"),
+            Ok(p) => p.path().join(plugins::PLUGIN_DEFINITION_FILE),
         };
         if !fp.exists() {
             continue;
@@ -156,7 +153,7 @@ async fn build_index() -> BoxResult {
         specs.push(definition);
     }
 
-    let mut output = File::create("index.yaml")?;
+    let mut output = File::create(repo::INDEX_FILE)?;
     serde_yaml::to_writer(&mut output, &specs)?;
 
     println!(
@@ -168,22 +165,19 @@ async fn build_index() -> BoxResult {
 }
 
 async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
-    let repo = repo::Repository::new(app_root, UPDATE_URL);
-    let mut project_manager = project::Manager::new(project_root.clone())?;
+    let repo = repo::Repository::new(app_root, repo::UPDATE_URL);
+    let mut project_manager = project::Project::new(project_root.clone())?;
     project_manager.open_or_new()?;
 
     for plugin in plugins {
-        let plugin_def = repo.find_plugin_definition(&plugin)?;
-        project_manager.add_plugin(plugin_def)?;
+        project_manager.add_plugin(repo.find_plugin_definition(&plugin)?)?;
     }
 
-    project_manager.save_package_config()?;
-
-    Ok(())
+    project_manager.save_package_config()
 }
 
 async fn package_list(_app_root: &Path, project_root: &PathBuf) -> BoxResult {
-    let mut pm = project::Manager::new(project_root.clone())?;
+    let mut pm = project::Project::new(project_root.clone())?;
     pm.open()?;
     match pm.package {
         None => return Err("❗ No package config found".into()),
@@ -211,20 +205,18 @@ async fn package_remove(
 }
 
 async fn project_init(project_root: &PathBuf) -> BoxResult {
-    let mut project_manager = project::Manager::new(project_root.to_path_buf())?;
-    project_manager.open_or_new()?;
-
-    Ok(())
+    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
+    project_manager.open_or_new()
 }
 
 async fn project_config(project_root: &PathBuf) -> BoxResult {
-    let mut project_manager = project::Manager::new(project_root.to_path_buf())?;
+    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
     project_manager.open()?;
     project_manager.write_configs()
 }
 
 async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
-    let mut project_manager = project::Manager::new(project_root.clone())?;
+    let mut project_manager = project::Project::new(project_root.clone())?;
     project_manager.open()?;
     let repo = repo::Repository::new(&app_root, UPDATE_URL);
     let project_config = project_manager.package.as_ref().expect("No package found?");
@@ -250,9 +242,7 @@ async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResul
         fsutil::copy_dir_all(&build_root, &sm_root)?;
     }
 
-    project_manager.write_configs()?;
-
-    Ok(())
+    project_manager.write_configs()
 }
 
 async fn search(root_path: &Path, query: String) -> BoxResult {
@@ -267,14 +257,14 @@ async fn search(root_path: &Path, query: String) -> BoxResult {
 async fn update(root_path: &Path) -> BoxResult {
     let repo = repo::Repository::new(root_path, UPDATE_URL);
     repo.update().await?;
-    println!("Updated local package cache");
+    println!("✅ Updated local package cache");
     Ok(())
 }
 
 async fn sdk_list(root: &PathBuf) -> BoxResult {
-    let sdk = sdk::Manager::new(&root);
+    let sdk_manager = sdk::Manager::new(&root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
-    let sdks = sdk.get_installed_sdks();
+    let sdks = sdk_manager.get_installed_sdks();
     for sdk in sdks {
         println!("🏷️  {}", sdk);
     }

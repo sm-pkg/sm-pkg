@@ -2,6 +2,8 @@ use crate::{BoxResult, fsutil, repo::Repository, sdk};
 use serde::{Deserialize, Serialize};
 use std::{collections, fmt::Display, fs::create_dir_all, path::PathBuf};
 
+pub const PLUGIN_DEFINITION_FILE: &str = "plugin.yaml";
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConfigFile {
     pub name: String,

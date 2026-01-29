@@ -195,3 +195,22 @@ pub struct AdminOverride {
 pub struct AdminOverridesCfg {
     pub overrides: Option<Vec<AdminOverride>>,
 }
+
+#[derive(Template, Serialize, Deserialize)]
+#[template(path = "tf/start.sh.jinja2", ext = "txt")]
+pub struct StartSh {
+    pub mod_folder: String,
+    pub port: Option<u16>,
+    pub tv_port: Option<u16>,
+    pub client_port: Option<u16>,
+    pub max_players: Option<u8>,
+    pub unrestricted_max_players: Option<bool>,
+    pub map: Option<String>,
+    pub gslt: Option<String>,
+    pub rcon_password: Option<String>,
+    pub sv_password: Option<String>,
+    pub region: Option<u8>,
+    pub ip: Option<String>,
+    pub sdr_enable: Option<bool>,
+    pub workshop_authkey: Option<String>,
+}

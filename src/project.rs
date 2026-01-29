@@ -1,8 +1,12 @@
-use crate::{BoxResult, plugins, sdk, templates};
+use crate::{BoxResult, VERSION, plugins, sdk, templates};
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::Write as _;
+use std::os::unix::fs::PermissionsExt;
 use std::{
+    collections::HashMap,
     fmt::Display,
     fs::File,
     path::{self, PathBuf},
@@ -16,14 +20,12 @@ pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 pub enum Game {
     #[default]
     TF,
-    HL2,
 }
 
 impl Game {
     pub fn mod_folder(&self) -> PathBuf {
         match self {
             Game::TF => PathBuf::from("tf"),
-            Game::HL2 => PathBuf::from("hl2"),
         }
     }
 }
@@ -32,7 +34,6 @@ impl Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Game::TF => write!(f, "Team Fortress 2"),
-            Game::HL2 => write!(f, "Half-Life 2"),
         }
     }
 }
@@ -40,9 +41,18 @@ impl Display for Game {
 #[derive(Serialize, Deserialize)]
 pub struct Package {
     pub game: Game,
+    pub create_startup_script: Option<bool>,
+    pub startup_opts: Option<templates::StartSh>,
     pub branch: sdk::Branch,
     pub plugins: Vec<String>,
     pub templates: Option<TemplateSet>,
+    pub raw_configs: Option<Vec<SimpleConfig>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SimpleConfig {
+    pub path: PathBuf,
+    pub options: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -58,16 +68,16 @@ pub struct TemplateSet {
 }
 
 /// Manager is responsible for loading and managing a project using its package configuration file, sm-pkg.yaml.
-pub struct Manager {
+pub struct Project {
     /// Root directory of the project.
     pub root: path::PathBuf,
     pub package: Option<Package>,
 }
 
-impl Manager {
+impl Project {
     pub fn new(root: path::PathBuf) -> BoxResult<Self> {
         println!("🏗️ Using project root {:?}", root);
-        Ok(Manager {
+        Ok(Project {
             root,
             package: None,
         })
@@ -149,7 +159,7 @@ impl Manager {
         let branch_opts = vec![sdk::Branch::Stable, sdk::Branch::Dev];
         let branch: Result<sdk::Branch, InquireError> =
             Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
-        let options: Vec<Game> = vec![Game::TF, Game::HL2];
+        let options: Vec<Game> = vec![Game::TF];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
         self.package = match game {
             Ok(choice) => Some(Package {
@@ -157,6 +167,9 @@ impl Manager {
                 game: choice,
                 plugins: Vec::new(),
                 templates: None,
+                raw_configs: None,
+                create_startup_script: None,
+                startup_opts: None,
             }),
             Err(_) => return Err("❗ Failed to select a game".into()),
         };
@@ -165,34 +178,71 @@ impl Manager {
     }
 
     pub fn write_configs(&self) -> BoxResult {
-        let configs = match &self.package {
-            Some(config) => match &config.templates {
-                Some(configs) => configs,
-                None => return Ok(()),
-            },
-            None => {
-                println!("⚠️ No configs were found, this is probably a mistake");
-                return Ok(());
-            }
+        let pkg = match &self.package {
+            None => return Err("No package loaded".into()),
+            Some(pkg) => pkg,
+        };
+        if let Some(configs) = &pkg.templates {
+            self.write_sourcemod_cfg(&configs.sourcemod_cfg)?;
+            self.write_core_cfg(&configs.core_cfg)?;
+            self.write_databases_cfg(&configs.databases_cfg)?;
+            self.write_maplists_cfg(&configs.maplists_cfg)?;
+            self.write_admins_cfg(&configs.admins_cfg)?;
+            self.write_admin_groups_cfg(&configs.admin_groups_cfg)?;
+            self.write_admin_overrides_cfg(&configs.admin_overrides_cfg)?;
+            self.write_admins_simple_ini(&configs.admins_simple_ini)?;
         };
 
-        self.write_sourcemod_cfg(&configs.sourcemod_cfg)?;
-        self.write_core_cfg(&configs.core_cfg)?;
-        self.write_databases_cfg(&configs.databases_cfg)?;
-        self.write_maplists_cfg(&configs.maplists_cfg)?;
-        self.write_admins_cfg(&configs.admins_cfg)?;
-        self.write_admin_groups_cfg(&configs.admin_groups_cfg)?;
-        self.write_admin_overrides_cfg(&configs.admin_overrides_cfg)?;
-        self.write_admins_simple_ini(&configs.admins_simple_ini)?;
+        if let Some(raw_configs) = &pkg.raw_configs {
+            self.write_raw_configs(raw_configs)?;
+        }
+
+        if let Some(create) = pkg.create_startup_script {
+            if create {
+                self.write_startup_script(&pkg.startup_opts)?
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_startup_script(&self, config: &Option<templates::StartSh>) -> BoxResult {
+        let script_path = self.root.join("start.sh");
+        match &config {
+            None => return Err("No startup_opts definition found".into()),
+            Some(template) => match write_cfg(&TagFormat::Shell, &script_path, template) {
+                Err(e) => Err(e.into()),
+                Ok(()) => {
+                    let mut perms = fs::metadata(&script_path)?.permissions();
+                    perms.set_mode(0o755);
+                    fs::set_permissions(&script_path, perms)?;
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    fn write_raw_configs(&self, raw_configs: &Vec<SimpleConfig>) -> BoxResult {
+        for raw_config in raw_configs {
+            let out_path = self.root.join(&raw_config.path);
+            let mut file = File::create(&out_path)?;
+            write_tag(&TagFormat::Ini, &mut file)?;
+            for (key, value) in &raw_config.options {
+                write!(file, "{} \"{}\"\n", key, value)?;
+            }
+            println!("📝 Created {}", out_path.display());
+        }
 
         Ok(())
     }
 
     fn write_sourcemod_cfg(&self, config: &Option<templates::SourcemodCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self.root.join("tf/cfg/sourcemod/sourcemod.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self.root.join("tf/cfg/sourcemod/sourcemod.cfg"),
+                template,
+            )?;
         }
 
         Ok(())
@@ -200,9 +250,11 @@ impl Manager {
 
     fn write_core_cfg(&self, config: &Option<templates::CoreCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self.root.join("tf/addons/sourcemod/configs/core.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self.root.join("tf/addons/sourcemod/configs/core.cfg"),
+                template,
+            )?;
         }
 
         Ok(())
@@ -210,9 +262,11 @@ impl Manager {
 
     fn write_databases_cfg(&self, config: &Option<templates::DatabasesCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self.root.join("tf/addons/sourcemod/configs/databases.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self.root.join("tf/addons/sourcemod/configs/databases.cfg"),
+                template,
+            )?
         }
 
         Ok(())
@@ -220,9 +274,11 @@ impl Manager {
 
     fn write_maplists_cfg(&self, config: &Option<templates::MaplistsCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self.root.join("tf/addons/sourcemod/configs/maplists.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self.root.join("tf/addons/sourcemod/configs/maplists.cfg"),
+                template,
+            )?;
         }
 
         Ok(())
@@ -230,11 +286,13 @@ impl Manager {
 
     fn write_admins_simple_ini(&self, config: &Option<templates::AdminsSimpleIni>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self
-                .root
-                .join("tf/addons/sourcemod/configs/admins_simple.ini");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self
+                    .root
+                    .join("tf/addons/sourcemod/configs/admins_simple.ini"),
+                template,
+            )?
         }
 
         Ok(())
@@ -242,9 +300,11 @@ impl Manager {
 
     fn write_admins_cfg(&self, config: &Option<templates::AdminsCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self.root.join("tf/addons/sourcemod/configs/admins.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self.root.join("tf/addons/sourcemod/configs/admins.cfg"),
+                template,
+            )?
         }
 
         Ok(())
@@ -252,11 +312,13 @@ impl Manager {
 
     fn write_admin_groups_cfg(&self, config: &Option<templates::AdminGroupsCfg>) -> BoxResult {
         if let Some(template) = &config {
-            let path = self
-                .root
-                .join("tf/addons/sourcemod/configs/admin_groups.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self
+                    .root
+                    .join("tf/addons/sourcemod/configs/admin_groups.cfg"),
+                template,
+            )?
         }
 
         Ok(())
@@ -267,31 +329,48 @@ impl Manager {
         config: &Option<templates::AdminOverridesCfg>,
     ) -> BoxResult {
         if let Some(template) = &config {
-            let path = self
-                .root
-                .join("tf/addons/sourcemod/configs/admin_overrides.cfg");
-            template.write_into(&mut File::create(&path)?)?;
-            println!("📝 Created {}", path.display());
+            write_cfg(
+                &TagFormat::Ini,
+                &self
+                    .root
+                    .join("tf/addons/sourcemod/configs/admin_overrides.cfg"),
+                template,
+            )?
         }
 
         Ok(())
     }
+}
 
-    // fn handle_template_cfg(&self, fc: &FileConfig, output_file: &mut File) -> BoxResult {
-    //     // Write out raw section first, explicit options should override anything in there.
-    //     match &fc.raw {
-    //         Some(content) => output_file.write_all(content.as_bytes())?,
-    //         None => (),
-    //     };
+enum TagFormat {
+    Shell,
+    Ini,
+}
 
-    //     match &fc.options {
-    //         Some(v) => {
-    //             for (key, value) in v {
-    //                 write!(output_file, "{} \"{}\"\n", key, value)?;
-    //             }
-    //             Ok(())
-    //         }
-    //         None => Ok(()),
-    //     }
-    // }
+fn write_tag(format: &TagFormat, fp: &mut impl std::io::Write) -> BoxResult {
+    let ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S");
+    let body = match format {
+        TagFormat::Ini => format!(
+            "// Generated by sm-pkg-{} - {}\n// DO NOT EDIT THIS FILE MANUALLY\n",
+            VERSION, ts
+        ),
+        TagFormat::Shell => format!(
+            "# Generated by sm-pkg-{} - {}\n# DO NOT EDIT THIS FILE MANUALLY\n",
+            VERSION, ts
+        ),
+    };
+    fp.write_all(body.as_bytes())?;
+    Ok(())
+}
+
+fn write_cfg(format: &TagFormat, path: &PathBuf, template: impl Template) -> BoxResult {
+    let mut fp = File::create(&path)?;
+    write_tag(format, &mut fp)?;
+    match Template::write_into(&template, &mut fp) {
+        Ok(()) => {
+            println!("📝 Created {}", path.display());
+            Ok(())
+        }
+        Err(err) => return Err(err.into()),
+    }
 }

@@ -4,6 +4,9 @@ use std::{fs::File, io::Write, path::Path};
 use crate::{BoxResult, plugins};
 
 const REPO_URL: &str = "https://github.com/sm-pkg/plugins";
+pub const UPDATE_URL: &str =
+    "https://raw.githubusercontent.com/sm-pkg/plugins/refs/heads/master/index.yaml";
+pub const INDEX_FILE: &str = "index.yaml";
 
 pub struct Repository<'a> {
     url: &'a str,
@@ -17,7 +20,7 @@ impl<'a> Repository<'a> {
 
     pub async fn update(&self) -> BoxResult {
         let body = reqwest::get(self.url).await?.bytes().await?;
-        let mut file = File::create(self.root.join("index.yaml"))?;
+        let mut file = File::create(self.root.join(INDEX_FILE))?;
         file.write_all(&body[..])?;
         self.checkout_repo()?;
 
@@ -29,7 +32,7 @@ impl<'a> Repository<'a> {
     }
 
     fn read_index(&self) -> Result<Vec<plugins::Definition>, Box<dyn std::error::Error>> {
-        let index = match File::open(self.root.join("index.yaml")) {
+        let index = match File::open(self.root.join(INDEX_FILE)) {
             Ok(file) => file,
             Err(e) => {
                 println!("Failed to find index.json, maybe you need to run update?");
