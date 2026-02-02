@@ -17,7 +17,7 @@ impl Config {
             Some(p) => {
                 let reader = File::open(p)?;
                 let config: Config = serde_yaml::from_reader(reader)?;
-                return Ok(config);
+                Ok(config)
             }
             None => Ok(Config {
                 compiler_args: sdk::CompilerArgs::default(),

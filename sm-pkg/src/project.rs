@@ -4,6 +4,7 @@ use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::{collections::HashMap, fmt::Display, fs::File, path::PathBuf};
 use std::{fmt, fs};
 
@@ -358,8 +359,8 @@ fn write_tag(format: &TagFormat, fp: &mut impl std::io::Write) -> BoxResult {
     Ok(())
 }
 
-fn write_cfg(format: &TagFormat, path: &PathBuf, template: impl Template) -> BoxResult {
-    let mut fp = File::create(&path)?;
+fn write_cfg(format: &TagFormat, path: &Path, template: impl Template) -> BoxResult {
+    let mut fp = File::create(path)?;
     write_tag(format, &mut fp)?;
     match Template::write_into(&template, &mut fp) {
         Ok(()) => {

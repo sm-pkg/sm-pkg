@@ -6,7 +6,7 @@ use std::{
     fs::{File, create_dir_all, remove_file},
     io::Write,
     os::unix::fs::symlink,
-    path::{self, PathBuf},
+    path::{self, Path, PathBuf},
     process::Command,
 };
 use tar::Archive;
@@ -55,8 +55,8 @@ impl<'a> Manager<'a> {
         game_dir: &PathBuf,
     ) -> BoxResult {
         match runtime {
-            Runtime::Sourcemod => self.install_sourcemod(branch, &game_dir).await,
-            Runtime::Metamod => self.install_metamod(branch, &game_dir).await,
+            Runtime::Sourcemod => self.install_sourcemod(branch, game_dir).await,
+            Runtime::Metamod => self.install_metamod(branch, game_dir).await,
         }
     }
 
@@ -124,7 +124,7 @@ impl<'a> Manager<'a> {
 
     pub async fn install_sourcemod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
         println!("⏳ Fetching latest version... ");
-        let latest_version = Self::fetch_latest_sourcemod_build(self, &branch).await?;
+        let latest_version = Self::fetch_latest_sourcemod_build(self, branch).await?;
         println!("🔎 Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
@@ -138,14 +138,14 @@ impl<'a> Manager<'a> {
             self.fetch_archive(target, &mut of).await?;
         }
 
-        self.extract_archive(&archive_path, &target_dir)?;
+        self.extract_archive(&archive_path, target_dir)?;
 
         Ok(())
     }
 
     pub async fn install_metamod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
         println!("⏳ Fetching latest version... ");
-        let latest_version = Self::fetch_latest_metamod_build(self, &branch).await?;
+        let latest_version = Self::fetch_latest_metamod_build(self, branch).await?;
         println!("🔎 Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
@@ -159,7 +159,7 @@ impl<'a> Manager<'a> {
             self.fetch_archive(target, &mut of).await?;
         }
 
-        self.extract_archive(&archive_path, &target_dir)?;
+        self.extract_archive(&archive_path, target_dir)?;
 
         Ok(())
     }
@@ -176,10 +176,10 @@ impl<'a> Manager<'a> {
         let mut sdks = Vec::new();
         if let Ok(entries) = std::fs::read_dir(self.app_root.join("sdks")) {
             for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name.starts_with("sourcemod-") {
-                        sdks.push(name.to_string());
-                    }
+                if let Some(name) = entry.file_name().to_str()
+                    && name.starts_with("sourcemod-")
+                {
+                    sdks.push(name.to_string());
                 }
             }
         }
@@ -231,15 +231,13 @@ impl<'a> Manager<'a> {
 
         let sdks = self.get_installed_sdks();
         if sdks.is_empty() {
-            return Err("No SDKs installed, try: sourcemod install".into());
+            Err("No SDKs installed, try: sourcemod install".into())
         } else {
             let wanted_sdk = sdks
                 .iter()
                 .find(|p| wanted == self.app_root.join("sdks").join(path::Path::new(p)));
             match wanted_sdk {
-                Some(path) => Ok(Environment::new(PathBuf::from(
-                    self.app_root.join("sdks").join(path),
-                ))),
+                Some(path) => Ok(Environment::new(self.app_root.join("sdks").join(path))),
                 None => Err("No SDK found for branch".into()),
             }
         }
@@ -363,7 +361,7 @@ impl Environment {
         );
 
         if let Some(compress_level) = args.compress_level
-            && (compress_level >= 1 && compress_level <= 9)
+            && (1..9).contains(&compress_level)
         {
             command.arg("-z").arg(format!("{:?}", compress_level));
         }
@@ -378,8 +376,7 @@ impl Environment {
         {
             command.arg("-v").arg(format!("{:?}", verbose));
         }
-        let mut tmp = args.active_dir.iter();
-        while let Some(active_dir) = tmp.next() {
+        if let Some(active_dir) = args.active_dir.iter().next() {
             command.arg("-D").arg(active_dir);
         }
         if let Some(prefix) = &args.prefix {
@@ -504,7 +501,7 @@ impl Default for CompilerArgs {
     }
 }
 
-fn default_include_path(sdk_path: &PathBuf) -> BoxResult<PathBuf> {
+fn default_include_path(sdk_path: &Path) -> BoxResult<PathBuf> {
     let include_path = sdk_path
         .join("addons")
         .join("sourcemod")

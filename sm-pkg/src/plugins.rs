@@ -4,7 +4,7 @@ use std::{
     collections,
     fmt::{Debug, Display},
     fs::create_dir_all,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -42,14 +42,14 @@ impl Display for Definition {
 }
 
 pub fn build(
-    app_root: &PathBuf,
+    app_root: &Path,
     sdk_env: &sdk::Environment,
-    build_root: &PathBuf,
+    build_root: &Path,
     repo: &LocalRepo,
     plugins: &Vec<String>,
 ) -> BoxResult<Vec<PathBuf>> {
     let mut outputs = Vec::new();
-    for plugin in repo.find_plugin_definitions(&plugins)? {
+    for plugin in repo.find_plugin_definitions(plugins)? {
         let src_tree = app_root.join("repo").join(&plugin.name).join("src");
         let build_dir = build_root.join(&plugin.name);
         create_dir_all(&build_dir)?;
@@ -62,7 +62,7 @@ pub fn build(
             for dep in deps {
                 let inc_tree = app_root
                     .join("repo")
-                    .join(&dep)
+                    .join(dep)
                     .join("src/scripting/include");
                 if !inc_tree.exists() {
                     return Err(
@@ -83,7 +83,7 @@ pub fn build(
 }
 
 /// Create an empty, new build context to build plugins under.
-pub fn create_build_root(app_root: &PathBuf) -> BoxResult<PathBuf> {
+pub fn create_build_root(app_root: &Path) -> BoxResult<PathBuf> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

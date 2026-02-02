@@ -207,9 +207,9 @@ async fn plugin_build(
     Ok(())
 }
 
-async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
+async fn plugin_add(app_root: &Path, project_root: &Path, plugins: Vec<String>) -> BoxResult {
     let repo = repo::LocalRepo::new(app_root);
-    let mut project_manager = project::Project::new(project_root.clone())?;
+    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
     project_manager.open_or_new()?;
 
     for plugin in plugins {
@@ -219,8 +219,8 @@ async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<Str
     project_manager.save_package_config()
 }
 
-async fn package_list(_app_root: &Path, project_root: &PathBuf) -> BoxResult {
-    let mut pm = project::Project::new(project_root.clone())?;
+async fn package_list(_app_root: &Path, project_root: &Path) -> BoxResult {
+    let mut pm = project::Project::new(project_root.to_path_buf())?;
     pm.open()?;
     match pm.package {
         None => return Err("❗ No package config found".into()),
@@ -246,19 +246,19 @@ async fn package_remove(
     Ok(())
 }
 
-async fn project_init(project_root: &PathBuf) -> BoxResult {
+async fn project_init(project_root: &Path) -> BoxResult {
     let mut project_manager = project::Project::new(project_root.to_path_buf())?;
     project_manager.open_or_new()
 }
 
-async fn project_config(project_root: &PathBuf) -> BoxResult {
+async fn project_config(project_root: &Path) -> BoxResult {
     let mut project_manager = project::Project::new(project_root.to_path_buf())?;
     project_manager.open()?;
     project_manager.write_configs()
 }
 
-async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
-    let mut project_manager = project::Project::new(project_root.clone())?;
+async fn package_install(app_root: &PathBuf, project_root: &Path) -> BoxResult {
+    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
     project_manager.open()?;
 
     let project_config = project_manager.package.as_ref().expect("No package found?");
@@ -272,7 +272,7 @@ async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResul
         &project_config.plugins,
     )?;
 
-    let mod_folder = project_root.join(&project_config.game.mod_folder());
+    let mod_folder = project_root.join(project_config.game.mod_folder());
     if !mod_folder.exists() {
         return Err(format!("Mod folder does not exist: {}", mod_folder.display()).into());
     }
@@ -322,8 +322,8 @@ async fn sdk_list(root: &PathBuf) -> BoxResult {
 async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
     let manager = sdk::Manager::new(root);
     let version = match runtime {
-        Runtime::Metamod => manager.fetch_latest_metamod_build(&branch).await?,
-        Runtime::Sourcemod => manager.fetch_latest_sourcemod_build(&branch).await?,
+        Runtime::Metamod => manager.fetch_latest_metamod_build(branch).await?,
+        Runtime::Sourcemod => manager.fetch_latest_sourcemod_build(branch).await?,
     };
 
     println!("🕓 Latest version: {version}");
@@ -331,6 +331,6 @@ async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxRe
 }
 
 async fn sdk_install(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
-    let sdk_manager = sdk::Manager::new(&root);
+    let sdk_manager = sdk::Manager::new(root);
     sdk_manager.install_sdk(runtime, branch).await
 }
