@@ -26,21 +26,10 @@
     },
     "inputs": {
       "type": "array",
+      "minItems": 1,
       "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name of the input"
-          },
-          "values": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "description": "List of values"
-            }
-          }
-        }
+        "type": "string",
+        "description": "The input (.sp) files for the package"
       }
     },
     "authors": {
@@ -65,5 +54,5 @@
       }
     }
   },
-  "required": ["name", "description", "version"]
+  "required": ["name", "description", "version", "inputs"]
 }
