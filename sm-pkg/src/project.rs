@@ -15,13 +15,14 @@ pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Default, Deserialize)]
 pub enum Game {
     #[default]
-    TF,
+    #[serde(alias = "tf2", alias = "Tf2")]
+    TF2,
 }
 
 impl Game {
     pub fn mod_folder(&self) -> PathBuf {
         match self {
-            Game::TF => PathBuf::from("tf"),
+            Game::TF2 => PathBuf::from("tf"),
         }
     }
 }
@@ -29,7 +30,7 @@ impl Game {
 impl Display for Game {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Game::TF => write!(f, "Team Fortress 2"),
+            Game::TF2 => write!(f, "Team Fortress 2"),
         }
     }
 }
@@ -155,7 +156,7 @@ impl Project {
         let branch_opts = vec![sdk::Branch::Stable, sdk::Branch::Dev];
         let branch: Result<sdk::Branch, InquireError> =
             Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
-        let options: Vec<Game> = vec![Game::TF];
+        let options: Vec<Game> = vec![Game::TF2];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
         self.package = match game {
             Ok(choice) => Some(Package {

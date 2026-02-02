@@ -1,3 +1,4 @@
+use crate::{BoxResult, plugins};
 use flate2::read::GzDecoder;
 use reqwest::Error;
 use serde::{Deserialize, Serialize};
@@ -11,8 +12,6 @@ use std::{
 };
 use tar::Archive;
 
-use crate::{BoxResult, plugins};
-
 const DL_CACHE: &str = "dl_cache";
 
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Default)]
@@ -25,7 +24,9 @@ pub enum Runtime {
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Default, Deserialize)]
 pub enum Branch {
     #[default]
+    #[serde(alias = "stable", alias = "STABLE")]
     Stable,
+    #[serde(alias = "dev", alias = "DEV")]
     Dev,
 }
 

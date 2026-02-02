@@ -27,8 +27,7 @@ impl Config {
 }
 
 fn config_path() -> Option<PathBuf> {
-    let config_path = PathBuf::from(CONFIG_FILE_PATH);
-    match config_path.try_resolve() {
+    match PathBuf::from(CONFIG_FILE_PATH).try_resolve() {
         Ok(path) => {
             if path.exists() {
                 Some(path.to_path_buf())
