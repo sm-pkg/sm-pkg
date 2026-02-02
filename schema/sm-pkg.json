@@ -6,14 +6,103 @@
   "properties": {
     "game": {
       "type": "string",
-      "description": "The name of the package",
-      "enum": ["TF"]
+      "description": "Game server type",
+      "enum": ["tf"]
     },
     "branch": {
       "type": "string",
       "description": "SDK branch to use",
-      "enum": ["Dev", "Stable"]
+      "enum": ["dev", "stable"]
     },
+    "create_startup_script": {
+      "type": "boolean",
+      "description": "Generate a startup script for the game server",
+      "default": false
+    },
+    "startup_opts": {
+      "type": "object",
+      "description": "Startup options for the game server",
+      "properties": {
+        "mod_folder": {
+          "type": "string",
+          "description": "Folder containing the game server mod",
+          "enum": ["tf"],
+          "default": "tf"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Port to run the game server on",
+          "default": 27015,
+          "maximum": 65535
+        },
+        "tv_port": {
+          "type": "integer",
+          "description": "Port to run the game server on",
+          "default": 27016,
+          "maximum": 65535
+        },
+        "client_port": {
+          "type": "integer",
+          "description": "Client port",
+          "default": 27017,
+          "maximum": 65535
+        },
+        "max_players": {
+          "type": "integer",
+          "description": "Maximum number of players allowed",
+          "default": 16,
+          "maximum": 101,
+          "minimum": 1
+        },
+        "unrestricted_max_players": {
+          "type": "boolean",
+          "description": "Unrestrict max players",
+          "default": false
+        },
+        "map": {
+          "type": "string",
+          "description": "Default startup map",
+          "default": "pl_badwater"
+        },
+        "gslt": {
+          "type": "string",
+          "description": "Game server login token. see: https://steamcommunity.com/dev/managegameservers",
+          "default": ""
+        },
+        "rcon_password": {
+          "type": "string",
+          "description": "RCON password",
+          "default": "tf"
+        },
+        "sv_password": {
+          "type": "string",
+          "description": "Server password",
+          "default": ""
+        },
+        "region": {
+          "type": "number",
+          "description": "Region to use. see: https://developer.valvesoftware.com/wiki/Sv_region",
+          "enum": [0, 1, 2, 3, 4, 5, 6, 7, 255]
+        },
+        "ip": {
+          "type": "string",
+          "description": "IP to listen on",
+          "default": "0.0.0.0"
+        },
+        "sdr_enable": {
+          "type": "boolean",
+          "description": "Enabled SDR VPN Network",
+          "default": false
+        },
+        "workshop_authkey": {
+          "type": "string",
+          "description": "Folder containing the game server mod",
+          "default": "tf"
+        }
+      },
+      "required": ["mod_folder"]
+    },
+
     "description": {
       "type": "string",
       "description": "Project description"
@@ -23,6 +112,20 @@
       "items": {
         "type": "string",
         "description": "List of plugins the project uses"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of templates the project uses"
+      }
+    },
+    "raw_configs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of raw configs the project uses"
       }
     }
   },

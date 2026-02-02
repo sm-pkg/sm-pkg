@@ -8,9 +8,9 @@
       "type": "string",
       "description": "The name of the package"
     },
-    "homepage": {
+    "url": {
       "type": "string",
-      "description": "The homepage of the package"
+      "description": "Home of the plugin"
     },
     "description": {
       "type": "string",
@@ -27,8 +27,20 @@
     "inputs": {
       "type": "array",
       "items": {
-        "type": "string",
-        "description": "The input files for the package"
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the input"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "List of values"
+            }
+          }
+        }
       }
     },
     "authors": {
@@ -36,6 +48,13 @@
       "items": {
         "type": "string",
         "description": "List of authors"
+      }
+    },
+    "configs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of configs"
       }
     },
     "dependencies": {
