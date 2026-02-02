@@ -53,7 +53,11 @@ impl std::fmt::Display for ImmunityMode {
 }
 
 #[derive(Template, Serialize, Deserialize, Debug)]
-#[template(path = "tf/cfg/sourcemod/sourcemod.cfg.jinja2", ext = "txt")]
+#[template(
+    path = "tf/cfg/sourcemod/sourcemod.cfg.jinja2",
+    ext = "txt",
+    whitespace = "suppress"
+)]
 pub struct SourcemodCfg {
     pub sm_show_activity: Option<u8>,
     pub sm_menu_sounds: Option<IntBool>,
@@ -75,7 +79,11 @@ pub struct SourcemodCfg {
 }
 
 #[derive(Template, Serialize, Deserialize, Debug)]
-#[template(path = "tf/addons/sourcemod/configs/core.cfg.jinja2", ext = "txt")]
+#[template(
+    path = "tf/addons/sourcemod/configs/core.cfg.jinja2",
+    ext = "txt",
+    whitespace = "suppress"
+)]
 pub struct CoreCfg {
     pub logging: Option<OnOffBool>,
     pub log_mode: Option<String>,
@@ -111,14 +119,22 @@ pub struct SourcemodDatabase {
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(path = "tf/addons/sourcemod/configs/databases.cfg.jinja2", ext = "txt")]
+#[template(
+    path = "tf/addons/sourcemod/configs/databases.cfg.jinja2",
+    ext = "txt",
+    whitespace = "suppress"
+)]
 pub struct DatabasesCfg {
     pub driver_default: Option<String>,
     pub databases: Option<Vec<SourcemodDatabase>>,
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(path = "tf/addons/sourcemod/configs/maplists.cfg.jinja2", ext = "txt")]
+#[template(
+    path = "tf/addons/sourcemod/configs/maplists.cfg.jinja2",
+    ext = "txt",
+    whitespace = "suppress"
+)]
 pub struct MaplistsCfg {
     pub default_target: Option<String>,
 }
@@ -134,7 +150,8 @@ pub struct SourcemodSimpleAdmin {
 #[derive(Template, Serialize, Deserialize)]
 #[template(
     path = "tf/addons/sourcemod/configs/admins_simple.ini.jinja2",
-    ext = "txt"
+    ext = "txt",
+    whitespace = "suppress"
 )]
 pub struct AdminsSimpleIni {
     pub users: Option<Vec<SourcemodSimpleAdmin>>,
@@ -152,7 +169,11 @@ pub struct SourcemodAdmin {
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(path = "tf/addons/sourcemod/configs/admins.cfg.jinja2", ext = "txt")]
+#[template(
+    path = "tf/addons/sourcemod/configs/admins.cfg.jinja2",
+    ext = "txt",
+    whitespace = "suppress"
+)]
 pub struct AdminsCfg {
     pub users: Option<Vec<SourcemodAdmin>>,
 }
@@ -174,7 +195,8 @@ pub struct AdminGroup {
 #[derive(Template, Serialize, Deserialize)]
 #[template(
     path = "tf/addons/sourcemod/configs/admin_groups.cfg.jinja2",
-    ext = "txt"
+    ext = "txt",
+    whitespace = "suppress"
 )]
 pub struct AdminGroupsCfg {
     pub default_immunity: Option<String>,
@@ -190,14 +212,15 @@ pub struct AdminOverride {
 #[derive(Template, Serialize, Deserialize)]
 #[template(
     path = "tf/addons/sourcemod/configs/admin_overrides.cfg.jinja2",
-    ext = "txt"
+    ext = "txt",
+    whitespace = "suppress"
 )]
 pub struct AdminOverridesCfg {
     pub overrides: Option<Vec<AdminOverride>>,
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(path = "tf/start.sh.jinja2", ext = "txt")]
+#[template(path = "tf/start.sh.jinja2", ext = "txt", whitespace = "suppress")]
 pub struct StartSh {
     pub mod_folder: String,
     pub port: Option<u16>,
