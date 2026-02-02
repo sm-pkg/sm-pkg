@@ -1872,7 +1872,6 @@ dependencies = [
  "serde",
  "serde_yaml",
  "tar",
- "tokio",
 ]
 
 [[package]]
@@ -1881,7 +1880,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "resolve-path",
- "serde",
  "serde_yaml",
  "sm-pkg",
  "tokio",
