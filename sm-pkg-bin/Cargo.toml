@@ -1,0 +1,12 @@
+[package]
+name = "sm-pkg-bin"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.56", features = ["derive", "color", "env"] }
+resolve-path = "0.1.0"
+sm-pkg = { path = "../sm-pkg" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }

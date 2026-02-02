@@ -2,15 +2,10 @@ use crate::{BoxResult, VERSION, plugins, sdk, templates};
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    fs::File,
-    path::{self, PathBuf},
-};
+use std::{collections::HashMap, fmt::Display, fs::File, path::PathBuf};
+use std::{fmt, fs};
 
 pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 
@@ -31,7 +26,7 @@ impl Game {
 }
 
 impl Display for Game {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Game::TF => write!(f, "Team Fortress 2"),
         }
@@ -70,12 +65,12 @@ pub struct TemplateSet {
 /// Manager is responsible for loading and managing a project using its package configuration file, sm-pkg.yaml.
 pub struct Project {
     /// Root directory of the project.
-    pub root: path::PathBuf,
+    pub root: PathBuf,
     pub package: Option<Package>,
 }
 
 impl Project {
-    pub fn new(root: path::PathBuf) -> BoxResult<Self> {
+    pub fn new(root: PathBuf) -> BoxResult<Self> {
         println!("🏗️ Using project root {:?}", root);
         Ok(Project {
             root,
@@ -197,10 +192,10 @@ impl Project {
             self.write_raw_configs(raw_configs)?;
         }
 
-        if let Some(create) = pkg.create_startup_script {
-            if create {
-                self.write_startup_script(&pkg.startup_opts)?
-            }
+        if let Some(create) = pkg.create_startup_script
+            && create
+        {
+            self.write_startup_script(&pkg.startup_opts)?
         }
 
         Ok(())
@@ -209,9 +204,9 @@ impl Project {
     fn write_startup_script(&self, config: &Option<templates::StartSh>) -> BoxResult {
         let script_path = self.root.join("start.sh");
         match &config {
-            None => return Err("No startup_opts definition found".into()),
+            None => Err("No startup_opts definition found".into()),
             Some(template) => match write_cfg(&TagFormat::Shell, &script_path, template) {
-                Err(e) => Err(e.into()),
+                Err(e) => Err(e),
                 Ok(()) => {
                     let mut perms = fs::metadata(&script_path)?.permissions();
                     perms.set_mode(0o755);
@@ -228,7 +223,7 @@ impl Project {
             let mut file = File::create(&out_path)?;
             write_tag(&TagFormat::Ini, &mut file)?;
             for (key, value) in &raw_config.options {
-                write!(file, "{} \"{}\"\n", key, value)?;
+                writeln!(file, "{} \"{}\"", key, value)?;
             }
             println!("📝 Created {}", out_path.display());
         }
@@ -371,6 +366,6 @@ fn write_cfg(format: &TagFormat, path: &PathBuf, template: impl Template) -> Box
             println!("📝 Created {}", path.display());
             Ok(())
         }
-        Err(err) => return Err(err.into()),
+        Err(err) => Err(err.into()),
     }
 }

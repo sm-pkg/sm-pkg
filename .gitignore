@@ -31,3 +31,4 @@ sm-pkg.yaml
 dist/
 .intentionally-empty-file.o
 target/
+test_root

@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
 use resolve_path::PathResolveExt;
 use sm_pkg::{
-    BoxResult, DEFAULT_ROOT, VERSION, fsutil, plugins, project,
+    BoxResult, DEFAULT_ROOT, VERSION, fsutil,
+    plugins::{self, create_build_root},
+    project,
     repo::{self},
     sdk::{self, Branch, Runtime},
 };
@@ -67,6 +69,18 @@ enum Commands {
         query: String,
     },
 
+    #[command(about = "Build one or more plugins", arg_required_else_help = true)]
+    Build {
+        #[arg(required = true)]
+        plugins: Vec<String>,
+
+        #[arg(short, long, default_value_t, value_enum)]
+        branch: Branch,
+
+        #[arg(short('r'), long)]
+        build_root: Option<PathBuf>,
+    },
+
     #[command(about = "Update package cache")]
     Update {},
 
@@ -123,6 +137,11 @@ async fn run() -> BoxResult {
         Commands::Update {} => update(&app_root_resolved).await,
         Commands::Init { project_root } => project_init(&project_root).await,
         Commands::Config { project_root } => project_config(&project_root).await,
+        Commands::Build {
+            plugins,
+            branch,
+            build_root,
+        } => plugin_build(&app_root_resolved, &plugins, &branch, build_root).await,
         Commands::Add {
             plugins,
             project_root,
@@ -164,6 +183,30 @@ async fn build_index() -> BoxResult {
     Ok(())
 }
 
+async fn plugin_build(
+    app_root: &PathBuf,
+    plugins: &Vec<String>,
+    branch: &Branch,
+    build_root_option: Option<PathBuf>,
+) -> BoxResult {
+    let build_root = match build_root_option {
+        Some(build_root) => build_root,
+        None => create_build_root(app_root)?,
+    };
+
+    let sdk_manager = sdk::Manager::new(app_root);
+    let repo = repo::LocalRepo::new(app_root);
+    let sdk_env = sdk_manager.get_sdk_env(branch)?;
+    match plugins::build(app_root, &sdk_env, &build_root, &repo, plugins) {
+        Err(e) => return Err(format!("❌ Failed to build plugins: {}", e).into()),
+        Ok(_) => {
+            println!("✅ Plugins built successfully. {}", build_root.display());
+        }
+    };
+
+    Ok(())
+}
+
 async fn plugin_add(app_root: &PathBuf, project_root: &PathBuf, plugins: Vec<String>) -> BoxResult {
     let repo = repo::LocalRepo::new(app_root);
     let mut project_manager = project::Project::new(project_root.clone())?;
@@ -182,13 +225,12 @@ async fn package_list(_app_root: &Path, project_root: &PathBuf) -> BoxResult {
     match pm.package {
         None => return Err("❗ No package config found".into()),
         Some(config) => {
-            println!("📋 Plugins added to package:");
-            match config.plugins.is_empty() {
-                true => println!("🤷‍♂️ No plugins added"),
-                false => {
-                    for plugin in config.plugins {
-                        println!("- {}", plugin);
-                    }
+            if config.plugins.is_empty() {
+                println!("🤷‍♂️ No plugins added");
+            } else {
+                println!("📋 Plugins added to package:");
+                for plugin in config.plugins {
+                    println!("- {}", plugin);
                 }
             }
         }
@@ -218,11 +260,17 @@ async fn project_config(project_root: &PathBuf) -> BoxResult {
 async fn package_install(app_root: &PathBuf, project_root: &PathBuf) -> BoxResult {
     let mut project_manager = project::Project::new(project_root.clone())?;
     project_manager.open()?;
-    let repo = repo::LocalRepo::new(&app_root);
+
     let project_config = project_manager.package.as_ref().expect("No package found?");
-    let sdk_manager = sdk::Manager::new(&app_root);
-    let sdk_env = sdk_manager.get_sdk_env(&project_config.branch)?;
-    let outputs = plugins::build(&app_root, &sdk_env, &repo, &project_config.plugins)?;
+    let sdk_manager = sdk::Manager::new(app_root);
+    let build_root = create_build_root(app_root)?;
+    let outputs = plugins::build(
+        app_root,
+        &sdk_manager.get_sdk_env(&project_config.branch)?,
+        &build_root,
+        &repo::LocalRepo::new(app_root),
+        &project_config.plugins,
+    )?;
 
     let mod_folder = project_root.join(&project_config.game.mod_folder());
     if !mod_folder.exists() {
@@ -262,7 +310,7 @@ async fn update(root_path: &Path) -> BoxResult {
 }
 
 async fn sdk_list(root: &PathBuf) -> BoxResult {
-    let sdk_manager = sdk::Manager::new(&root);
+    let sdk_manager = sdk::Manager::new(root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk_manager.get_installed_sdks();
     for sdk in sdks {
@@ -272,7 +320,7 @@ async fn sdk_list(root: &PathBuf) -> BoxResult {
 }
 
 async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
-    let manager = sdk::Manager::new(&root);
+    let manager = sdk::Manager::new(root);
     let version = match runtime {
         Runtime::Metamod => manager.fetch_latest_metamod_build(&branch).await?,
         Runtime::Sourcemod => manager.fetch_latest_sourcemod_build(&branch).await?,
@@ -283,5 +331,6 @@ async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxRe
 }
 
 async fn sdk_install(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
-    sdk::Manager::new(&root).install_sdk(runtime, branch).await
+    let sdk_manager = sdk::Manager::new(&root);
+    sdk_manager.install_sdk(runtime, branch).await
 }

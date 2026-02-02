@@ -264,7 +264,13 @@ impl Environment {
     }
 
     pub fn args(&self) -> CompilerArgs {
-        let mut args = CompilerArgs::new(&self.sdk_root);
+        let mut args = CompilerArgs::default();
+
+        match default_include_path(&self.sdk_root) {
+            Ok(include) => args.include(include),
+            Err(e) => eprintln!("Cannot find default include path: {}", e),
+        }
+
         args.include(
             self.sdk_root
                 .join("addons")
@@ -326,8 +332,8 @@ impl Environment {
                 // println!("Calling: {:?}", command);
                 print!("🔨 Compiling {:?} -> ", input);
                 match &args.output {
-                    Some(out) => println!("into {:?}", out),
-                    None => println!("into ."),
+                    Some(out) => println!("{}", out.display()),
+                    None => println!("."),
                 }
 
                 let output = command.output().expect("Failed to execute spcomp64");
@@ -382,8 +388,10 @@ impl Environment {
         if let Some(output) = &args.output {
             command.arg("-o").arg(output);
         }
-        for include in &args.includes {
-            command.arg("-i").arg(include);
+        if let Some(inclues) = &args.includes {
+            for include in inclues {
+                command.arg("-i").arg(include);
+            }
         }
         if args.warnings_as_error.unwrap_or(false) {
             command.arg("-E");
@@ -415,42 +423,71 @@ impl Environment {
         command
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompilerArgs {
-    pub includes: Vec<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub includes: Option<Vec<PathBuf>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub warnings: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub use_stderr: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub show_stats: Option<bool>,
-    pub macro_defs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub macro_defs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub require_semicolons: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub syntax_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub no_verify: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_file: Option<PathBuf>,
-    pub active_dir: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub warnings_as_error: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub show_includes: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compress_level: Option<u8>,
-    pub output: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tabsize: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verbose: Option<u8>,
+
+    // These dont really make sense to serialize as they are only known at runtime.
+    #[serde(skip_serializing)]
+    pub active_dir: Option<PathBuf>,
+
+    #[serde(skip_serializing)]
+    pub output: Option<PathBuf>,
 }
 
 impl CompilerArgs {
     pub fn include(&mut self, path: PathBuf) {
-        if !self.includes.contains(&path) {
-            self.includes.push(path.clone());
+        match &mut self.includes {
+            Some(inc) => {
+                if !inc.contains(&path) {
+                    inc.push(path.clone());
+                }
+            }
+            None => {
+                self.includes = Some(vec![path]);
+            }
         }
     }
 }
 
-impl CompilerArgs {
-    pub fn new(sdk_root: &PathBuf) -> Self {
-        let mut args = CompilerArgs {
-            includes: Vec::new(),
+impl Default for CompilerArgs {
+    fn default() -> Self {
+        CompilerArgs {
+            includes: None,
             warnings: Some(Vec::new()),
             use_stderr: Some(true),
             show_stats: Some(true),
-            macro_defs: Vec::new(),
+            macro_defs: Some(Vec::new()),
             require_semicolons: Some(true),
             syntax_only: Some(false),
             no_verify: Some(false),
@@ -463,14 +500,7 @@ impl CompilerArgs {
             prefix: None,
             tabsize: Some(4),
             verbose: Some(0),
-        };
-
-        match default_include_path(&sdk_root) {
-            Ok(include) => args.include(include),
-            Err(e) => eprintln!("Warn, cannot find default include path: {}", e),
         }
-
-        args
     }
 }
 
