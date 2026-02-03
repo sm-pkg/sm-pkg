@@ -30,7 +30,7 @@ impl<'a> LocalRepo<'a> {
     }
 
     fn read_index(&self) -> Result<Vec<plugins::Definition>, Box<dyn std::error::Error>> {
-        let index = match File::open(self.root.join(INDEX_FILE)) {
+        let index = match File::open(self.root.join("repo").join(INDEX_FILE)) {
             Ok(file) => file,
             Err(e) => {
                 println!("Failed to find index.json, maybe you need to run update?");

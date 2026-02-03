@@ -31,7 +31,6 @@ pub struct Definition {
     pub dependencies: Option<Vec<String>>,
     /// The full path to the plugin's directory
     pub path: Option<PathBuf>,
-
     pub configs: Option<Vec<ConfigFile>>,
 }
 
@@ -53,7 +52,6 @@ pub fn build(
         let src_tree = app_root.join("repo").join(&plugin.name).join("src");
         let build_dir = build_root.join(&plugin.name);
         create_dir_all(&build_dir)?;
-
         fsutil::copy_dir_all(src_tree, &build_dir)?;
 
         if let Some(deps) = &plugin.dependencies {
@@ -69,12 +67,15 @@ pub fn build(
                         format!("Dependency include directory not found: {:?}", inc_tree).into(),
                     );
                 }
-                println!("{} inc: {:?} -> {:?}", dep, inc_tree, include_dir);
+                println!("➕ Adding {} includes", dep);
+                fsutil::copy_dir_all(inc_tree, &include_dir)?;
             }
         }
 
         let mut args = sdk_env.args();
         args.active_dir = Some(build_dir.join("scripting"));
+        // The path must be a full absolute path
+        args.include(build_dir.clone().join("include").canonicalize()?);
         sdk_env.compile(&mut args, &plugin)?;
         outputs.push(build_dir);
     }

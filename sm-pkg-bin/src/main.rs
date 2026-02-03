@@ -200,7 +200,7 @@ async fn plugin_build(
     match plugins::build(app_root, &sdk_env, &build_root, &repo, plugins) {
         Err(e) => return Err(format!("❌ Failed to build plugins: {}", e).into()),
         Ok(_) => {
-            println!("✅ Plugins built successfully. {}", build_root.display());
+            println!("✅ Plugins built successfully: {}", build_root.display());
         }
     };
 
