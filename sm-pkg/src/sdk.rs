@@ -334,7 +334,6 @@ impl Environment {
 
                 let mut command = self.build_command(args);
                 command.arg(input);
-                // println!("Calling: {:?}", command);
                 print!("🔨 Compiling {:?} -> ", input);
                 match &args.output {
                     Some(out) => println!("{}", out.display()),
