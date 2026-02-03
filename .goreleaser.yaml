@@ -53,8 +53,3 @@ release:
   replace_existing_draft: true
   use_existing_draft: true
   replace_existing_artifacts: true
-  footer: >-
-
-    ---
-
-    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
