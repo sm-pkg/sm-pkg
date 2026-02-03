@@ -1,6 +1,7 @@
 use crate::{BoxResult, plugins};
 use flate2::read::GzDecoder;
 use reqwest::Error;
+use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
@@ -314,16 +315,21 @@ impl Environment {
                 let mut out_bin = input.clone();
                 out_bin.set_extension("smx");
 
-                args.output = match &args.active_dir {
+                let out_path = match &args.active_dir {
                     Some(dir) => {
                         let out_dir = dir.join("..").join("plugins");
                         if !out_dir.exists() {
                             create_dir_all(&out_dir)?;
                         }
 
-                        Some(out_dir.join(&out_bin))
+                        out_dir.join(&out_bin)
                     }
-                    None => Some(PathBuf::from(&out_bin)),
+                    None => PathBuf::from(&out_bin),
+                };
+
+                args.output = match out_path.try_resolve() {
+                    Err(err) => return Err(err.into()),
+                    Ok(path) => Some(path.to_path_buf()),
                 };
 
                 let mut command = self.build_command(args);
