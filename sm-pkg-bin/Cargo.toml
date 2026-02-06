@@ -1,7 +1,9 @@
 [package]
 name = "sm-pkg-bin"
-version = "0.1.0"
 edition = "2024"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
 
 [dependencies]
 clap = { version = "4.5.57", features = ["derive", "color", "env"] }
