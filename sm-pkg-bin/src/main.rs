@@ -135,8 +135,10 @@ async fn run() -> BoxResult {
         Commands::SDKList {} => sdk_list(&app_root_resolved).await,
         Commands::Search { query } => search(&app_root_resolved, query).await,
         Commands::Update {} => update(&app_root_resolved).await,
-        Commands::Init { project_root } => project_init(&project_root).await,
-        Commands::Config { project_root } => project_config(&project_root).await,
+        Commands::Init { project_root } => project_init(&app_root_resolved, &project_root).await,
+        Commands::Config { project_root } => {
+            project_config(&app_root_resolved, &project_root).await
+        }
         Commands::Build {
             plugins,
             branch,
@@ -184,7 +186,7 @@ async fn build_index() -> BoxResult {
 }
 
 async fn plugin_build(
-    app_root: &PathBuf,
+    app_root: &Path,
     plugins: &Vec<String>,
     branch: &Branch,
     build_root_option: Option<PathBuf>,
@@ -209,7 +211,7 @@ async fn plugin_build(
 
 async fn plugin_add(app_root: &Path, project_root: &Path, plugins: Vec<String>) -> BoxResult {
     let repo = repo::LocalRepo::new(app_root);
-    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
+    let mut project_manager = project::Project::new(&project_root, &repo)?;
     project_manager.open_or_new()?;
 
     for plugin in plugins {
@@ -219,8 +221,9 @@ async fn plugin_add(app_root: &Path, project_root: &Path, plugins: Vec<String>) 
     project_manager.save_package_config()
 }
 
-async fn package_list(_app_root: &Path, project_root: &Path) -> BoxResult {
-    let mut pm = project::Project::new(project_root.to_path_buf())?;
+async fn package_list(app_root: &Path, project_root: &Path) -> BoxResult {
+    let repo = repo::LocalRepo::new(app_root);
+    let mut pm = project::Project::new(&project_root, &repo)?;
     pm.open()?;
     match pm.package {
         None => return Err("❗ No package config found".into()),
@@ -246,19 +249,22 @@ async fn package_remove(
     Ok(())
 }
 
-async fn project_init(project_root: &Path) -> BoxResult {
-    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
+async fn project_init(app_root: &Path, project_root: &Path) -> BoxResult {
+    let repo = repo::LocalRepo::new(app_root);
+    let mut project_manager = project::Project::new(&project_root, &repo)?;
     project_manager.open_or_new()
 }
 
-async fn project_config(project_root: &Path) -> BoxResult {
-    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
+async fn project_config(app_root: &Path, project_root: &Path) -> BoxResult {
+    let repo = repo::LocalRepo::new(app_root);
+    let mut project_manager = project::Project::new(&project_root, &repo)?;
     project_manager.open()?;
     project_manager.write_configs()
 }
 
-async fn package_install(app_root: &PathBuf, project_root: &Path) -> BoxResult {
-    let mut project_manager = project::Project::new(project_root.to_path_buf())?;
+async fn package_install(app_root: &Path, project_root: &Path) -> BoxResult {
+    let repo = repo::LocalRepo::new(app_root);
+    let mut project_manager = project::Project::new(&project_root, &repo)?;
     project_manager.open()?;
 
     let project_config = project_manager.package.as_ref().expect("No package found?");
@@ -309,7 +315,7 @@ async fn update(root_path: &Path) -> BoxResult {
     Ok(())
 }
 
-async fn sdk_list(root: &PathBuf) -> BoxResult {
+async fn sdk_list(root: &Path) -> BoxResult {
     let sdk_manager = sdk::Manager::new(root);
     println!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk_manager.get_installed_sdks();
@@ -319,7 +325,7 @@ async fn sdk_list(root: &PathBuf) -> BoxResult {
     Ok(())
 }
 
-async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
+async fn sdk_latest(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResult {
     let manager = sdk::Manager::new(root);
     let version = match runtime {
         Runtime::Metamod => manager.fetch_latest_metamod_build(branch).await?,
@@ -330,7 +336,7 @@ async fn sdk_latest(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxRe
     Ok(())
 }
 
-async fn sdk_install(root: &PathBuf, runtime: &Runtime, branch: &Branch) -> BoxResult {
+async fn sdk_install(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResult {
     let sdk_manager = sdk::Manager::new(root);
     sdk_manager.install_sdk(runtime, branch).await
 }

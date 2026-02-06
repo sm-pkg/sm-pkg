@@ -1,7 +1,11 @@
-use crate::{BoxResult, fsutil, repo::LocalRepo, sdk};
+use crate::{
+    BoxResult, fsutil,
+    project::{Game, SimpleConfig},
+    repo::LocalRepo,
+    sdk,
+};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections,
     fmt::{Debug, Display},
     fs::create_dir_all,
     path::{Path, PathBuf},
@@ -9,12 +13,6 @@ use std::{
 };
 
 pub const PLUGIN_DEFINITION_FILE: &str = "plugin.yaml";
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ConfigFile {
-    pub name: String,
-    pub values: collections::HashMap<String, String>,
-}
 
 /// Definition of a plugin.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -31,7 +29,8 @@ pub struct Definition {
     pub dependencies: Option<Vec<String>>,
     /// The full path to the plugin's directory
     pub path: Option<PathBuf>,
-    pub configs: Option<Vec<ConfigFile>>,
+    pub configs: Option<Vec<SimpleConfig>>,
+    pub games: Option<Vec<Game>>,
 }
 
 impl Display for Definition {

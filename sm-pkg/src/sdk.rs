@@ -42,11 +42,11 @@ impl Display for Branch {
 
 pub struct Manager<'a> {
     /// The root directory
-    app_root: &'a PathBuf,
+    app_root: &'a Path,
 }
 
 impl<'a> Manager<'a> {
-    pub fn new(app_root: &'a PathBuf) -> Self {
+    pub fn new(app_root: &'a Path) -> Self {
         Manager { app_root }
     }
 
