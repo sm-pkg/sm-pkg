@@ -7,7 +7,7 @@
     "game": {
       "type": "string",
       "description": "Game server type",
-      "enum": ["tf"]
+      "enum": ["tf2"]
     },
     "branch": {
       "type": "string",
@@ -115,17 +115,438 @@
       }
     },
     "templates": {
-      "type": "array",
+      "type": "object",
       "items": {
-        "type": "string",
-        "description": "List of templates the project uses"
+        "maplists_cfg": {
+          "type": "object",
+          "properties": {
+            "default_target": {
+              "type": "string",
+              "description": "There is one section by default, called \"mapcyclefile\" - it is mapped to the <mapcycle.txt> file, or whatever the contents of your mapcyclefile cvar is."
+            }
+          }
+        },
+        "databases_cfg": {
+          "type": "object",
+          "properties": {
+            "driver_default": {
+              "type": "string",
+              "description": "Default database driver to use",
+              "default": "sqlite",
+              "enum": ["sqlite", "mysql", "postgres"]
+            },
+            "databases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the database",
+                    "required": true
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "Host of the database"
+                  },
+                  "port": {
+                    "type": "number",
+                    "description": "Port of the database",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "default": 3306
+                  },
+                  "user": {
+                    "type": "string",
+                    "description": "Username of the database"
+                  },
+                  "pass": {
+                    "type": "string",
+                    "description": "Password of the database"
+                  },
+                  "database": {
+                    "type": "string",
+                    "description": "Database name",
+                    "required": true
+                  },
+                  "driver": {
+                    "type": "string",
+                    "description": "Database driver to use",
+                    "enum": ["sqlite", "mysql", "postgres"]
+                  }
+                },
+                "required": ["name", "host", "port", "user", "password", "database"]
+              }
+            }
+          }
+        },
+        "core_cfg": {
+          "type": "object",
+          "properties": {
+            "logging": {
+              "type": "boolean",
+              "description": "This option determines if SourceMod logging is enabled.",
+              "default": true
+            },
+            "log_mode": {
+              "type": "string",
+              "description": "This option determines how SourceMod logging should be handled.",
+              "default": "daily",
+              "enum": ["daily", "map", "game"]
+            },
+            "log_time_format": {
+              "type": "string",
+              "description": "This option determines the time format SourceMod logging should use.",
+              "default": "default"
+            },
+            "server_lang": {
+              "type": "string",
+              "description": "Language that multilingual enabled plugins and extensions will use to print messages. Only languages listed in languages.cfg are valid.",
+              "default": "en"
+            },
+            "public_chat_trigger": {
+              "type": "string",
+              "description": "List of characters to use for public chat triggers.  Set an empty list to disable.",
+              "default": "!"
+            },
+            "silent_chat_trigger": {
+              "type": "string",
+              "default": "/",
+              "description": "List of characters to use for silent chat triggers.  Set an empty list to disable."
+            },
+            "silent_fail_suppress": {
+              "type": "boolean",
+              "default": false,
+              "description": "If a say command is a silent chat trigger, and is used by an admin, but it does not evaluate to an actual command, it will be displayed publicly.  This setting allows you to suppress accidental typings."
+            },
+            "pass_info_var": {
+              "type": "string",
+              "description": "Password setinfo key that clients must set.  You must change this in order for passwords to work, for security reasons.",
+              "default": "_password"
+            },
+            "allow_cl_language_var": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enables or disables whether SourceMod reads a client's cl_language cvar to set their language for server-side phrase translation."
+            },
+            "disable_auto_update": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enables or Disables SourceMod's automatic gamedata updating."
+            },
+            "force_restart_after_update": {
+              "type": "boolean",
+              "default": false,
+              "description": "If set to yes, a successful gamedata update will attempt to restart SourceMod. SourceMod is unloaded and reloaded, and the map is changed to the current map. Since gamedata updates occur when the server loads, impact should be minimal. But to be safe, this option is disabled by default."
+            },
+            "auto_update_url": {
+              "type": "string",
+              "default": "http://update.sourcemod.net/update/",
+              "description": "URL to use for retrieving update information. SSL is not yet supported."
+            },
+            "debug_spew": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether to show debug spew. Currently this will log details about the gamedata updating process."
+            },
+            "steam_authstring_validation": {
+              "type": "boolean",
+              "default": true,
+              "description": "If set to yes, SourceMod will validate steamid auth strings with the Steam backend before giving out admin access. This can prevent malicious users from impersonating admins with stolen Steam apptickets. If Steam is down, admins will not be authenticated until Steam comes back up. This option increases the security of your server, but is still experimental."
+            },
+            "block_bad_plugins": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enables or disables whether SourceMod blocks known or potentially malicious plugins from loading. It is STRONGLY advised that this is left enabled, there have been cases in the past with plugins that allow anyone to delete files on the server, gain full rcon control, etc."
+            },
+            "slow_script_timeout": {
+              "type": "number",
+              "default": 8,
+              "description": "If a plugin takes too long to execute, hanging or freezing the game server in the process, SourceMod will attempt to terminate that plugin after the specified timeout length has passed. You can disable this feature by setting the value to \"0\"."
+            },
+            "follow_csgo_server_guidelines": {
+              "type": "boolean",
+              "default": true,
+              "description": "Per \"http://blog.counter-strike.net/index.php/server_guidelines/\", certain plugin functionality will trigger all of the game server owner's Game Server Login Tokens (GSLTs) to get banned when executed on a Counter-Strike: Global Offensive game server. Enabling this option will block plugins from using functionality that is known to cause this. This option only has any effect on CS:GO. Note that this does NOT guarantee that you cannot receive a ban."
+            },
+            "jit_metadata": {
+              "type": "string",
+              "default": "default",
+              "description": "Controls whether the SourcePawn runtime will generate additional metadata about JIT-compiled functions for performance profiling or debugging purposes.",
+              "enum": ["none", "default", "perf", "jitdump"]
+            },
+            "enable_line_debugging": {
+              "type": "boolean",
+              "default": false,
+              "description": "Setup the SourcePawn VM to enable extensions to use a debugging API to step through plugins line by line. This heavily decreases server performance and should NEVER be used on a production server, but ONLY during plugin development."
+            }
+          }
+        },
+        "admins_simple_cfg": {
+          "type": "object",
+          "properties": {
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "identity": {
+                    "type": "string",
+                    "description": "For the Identity, you can use a SteamID or Name.  To use an IP address, prepend a ! character.",
+                    "required": true
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Passwords are generally not needed unless you have name-based authentication."
+                  },
+                  "flags": {
+                    "type": "string",
+                    "description": "The flags of the user",
+                    "required": true
+                  },
+                  "immunity": {
+                    "type": "number",
+                    "description": "Immunity values can be any number. An admin cannot target an admin witha higher access value (see sm_immunity_mode to tweak the rules). Default immunity value is 0 (no immunity).",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "admins_cfg": {
+          "type": "object",
+          "properties": {
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the user",
+                    "required": true
+                  },
+                  "auth": {
+                    "type": "string",
+                    "description": "Auth method to use.",
+                    "required": true,
+                    "enum": ["steam", "name", "ip"]
+                  },
+                  "identity": {
+                    "type": "string",
+                    "description": " Identification string, for example, a steamid or name.",
+                    "required": true
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Optional password to require."
+                  },
+                  "group": {
+                    "type": "string",
+                    "description": "Adds one group to the user's group table."
+                  },
+                  "flags": {
+                    "type": "string",
+                    "description": "Adds one or more flags to the user's permissions.",
+                    "required": true
+                  },
+                  "immunity": {
+                    "type": "number",
+                    "description": "Immunity values can be any number. An admin cannot target an admin with a higher access value (see sm_immunity_mode to tweak the rules). Default immunity value is 0 (no immunity).",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "admin_groups_cfg": {
+          "type": "object",
+          "properties": {
+            "default_immunity": {
+              "type": "string",
+              "description": ""
+            },
+            "groups": {
+              "type": "array",
+              "description": "",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the group."
+                  },
+                  "flags": {
+                    "type": "array",
+                    "description": "An array of permission flags.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "immunity": {
+                    "type": "number",
+                    "description": "Immunity values can be any number. An admin cannot target an admin with a higher access value (see sm_immunity_mode to tweak the rules). Default immunity value is 0 (no immunity).",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "overrides": {
+                    "type": "array",
+                    "description": "Group overrides",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "description": "The name of the override."
+                        },
+                        "action": {
+                          "type": "string",
+                          "description": "Action override."
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": ["name", "permissions", "immunity"]
+              }
+            }
+          }
+        },
+        "admin_overrides_cfg": {
+          "type": "object",
+          "properties": {
+            "overrides": {
+              "type": "array",
+              "description": "The name of the override.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "Command to override."
+                  },
+                  "flags": {
+                    "type": "string",
+                    "description": "Flags to override."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sourcemod_cfg": {
+          "type": "object",
+          "properties": {
+            "sm_show_activity": {
+              "type": "number",
+              "default": 13,
+              "description": "Specifies how admin activity should be relayed to users"
+            },
+            "sm_menu_sounds": {
+              "type": "boolean",
+              "default": true,
+              "description": "Specifies whether menu sounds are enabled for menus created by SourceMod."
+            },
+            "sm_vote_delay": {
+              "type": "number",
+              "default": 30,
+              "description": "Specifies how long of a delay, in seconds, should be used in between votes that are \"public\" or can be spammed.  Whether or not this delay is obeyed is dependent on the menu/command."
+            },
+            "sm_datetime_format": {
+              "type": "string",
+              "default": "%m/%d/%Y - %H:%M:%S",
+              "description": "Default datetime formatting rules when displaying to clients. For full options, see: http://www.opengroup.org/onlinepubs/007908799/xsh/strftime.html"
+            },
+            "sm_immunity_mode": {
+              "type": "number",
+              "default": 1,
+              "description": "Sets how SourceMod should check immunity levels when administrators target each other.",
+              "enum": [0, 1, 2, 3]
+            },
+            "sm_time_adjustment": {
+              "type": "number",
+              "default": 0,
+              "description": "Sets how many seconds SourceMod should adjust time values for incorrect server clocks."
+            },
+            "sm_flood_time": {
+              "type": "number",
+              "default": 0.75,
+              "description": "Specifies the amount of time that is allowed between chat messages."
+            },
+            "sm_reserve_type": {
+              "type": "number",
+              "default": 0,
+              "description": "Specifies how the reserved slots plugin operates.",
+              "enum": [0, 1, 2]
+            },
+            "sm_reserved_slots": {
+              "type": "number",
+              "default": false,
+              "description": "Specifies the number of reserved player slots."
+            },
+            "sm_hide_slots": {
+              "type": "boolean",
+              "default": false,
+              "description": " Specifies whether or not reserved slots will be hidden (subtracted from max slot count). Valid values are 0 (Visible) or 1 (Hidden)."
+            },
+            "sm_chat_mode": {
+              "type": "boolean",
+              "default": true,
+              "description": "Specifies whether or not non-admins can send messages to admins using say_team @<message>. Valid values are 0 (Disabled) or 1 (Enabled)"
+            },
+            "sm_timeleft_interval": {
+              "type": "number",
+              "default": false,
+              "description": "Specifies whether or not \"timeleft\" will automatically be triggered every x seconds. Valid values are 0 (Disabled) to 1800 seconds."
+            },
+            "sm_trigger_show": {
+              "type": "boolean",
+              "default": false,
+              "description": "Specifies whether or not chat triggers are broadcast to the server or just the player who requested the info trigger. Valid values are 0 (Disabled) or 1 (Enabled)"
+            },
+            "sm_vote_progress_hintbox": {
+              "type": "boolean",
+              "default": false,
+              "description": "Specifies whether or not to display vote progress to clients in the \"hint\" box (near the bottom of the screen in most games). Valid values are 0 (Disabled) or 1 (Enabled)"
+            },
+            "sm_vote_progress_chat": {
+              "type": "boolean",
+              "default": false,
+              "description": "Specifies whether or not to display vote progress to clients in the chat area. Valid values are 0 (Disabled) or 1 (Enabled)."
+            },
+            "sm_vote_progress_console": {
+              "type": "boolean",
+              "default": false,
+              "description": "Specifies whether or not to display vote progress in the server console. Valid values are 0 (Disabled) or 1 (Enabled)."
+            },
+            "sm_vote_progress_client_console": {
+              "type": "boolean",
+              "description": "Specifies whether or not to display vote progress to clients in the client console. Valid values are 0 (Disabled) or 1 (Enabled).",
+              "default": false
+            }
+          }
+        }
       }
     },
     "raw_configs": {
       "type": "array",
+      "description": "List of raw configs the project uses",
       "items": {
-        "type": "string",
-        "description": "List of raw configs the project uses"
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the config file, relative to the target root."
+          },
+          "options": {
+            "type": "object",
+            "description": "key value config pairs"
+          }
+        }
       }
     }
   },

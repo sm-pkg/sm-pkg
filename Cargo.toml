@@ -2,13 +2,20 @@
 members = ["sm-pkg", "sm-pkg-bin"]
 resolver = "3"
 
+[workspace.package]
+version = "0.1.1"
+description = "A sourcemod package manager"
+readme = "README.md"
+license = "MIT"
+authors = ["Leigh MacDonald <leigh.macdonald@gmail.com>"]
+
 [profile.dev]
-opt-level = 1       # Low-level optimization for faster dev builds
-debug = true        # Include debug symbols
+opt-level = 1          # Low-level optimization for faster dev builds
+debug = true           # Include debug symbols
 overflow-checks = true
 
 [profile.release]
-opt-level = 3    # Maximum optimization for performance
-debug = false    # Exclude debug symbols for smaller binary size
-lto = true       # Link-Time Optimization for further size reduction
-panic = "abort"  # Use `abort` to reduce binary size further
+opt-level = 3   # Maximum optimization for performance
+debug = false   # Exclude debug symbols for smaller binary size
+lto = true      # Link-Time Optimization for further size reduction
+panic = "abort" # Use `abort` to reduce binary size further

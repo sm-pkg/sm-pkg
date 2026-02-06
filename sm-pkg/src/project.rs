@@ -1,4 +1,4 @@
-use crate::{BoxResult, VERSION, plugins, sdk, templates};
+use crate::{BoxResult, VERSION, plugins, repo, sdk, templates};
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
@@ -14,15 +14,103 @@ pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 // https://github.com/alliedmodders/sourcemod/tree/master/gamedata/sdktools.games
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Default, Deserialize)]
 pub enum Game {
+    AG2,
+    ALIENSWARM,
+    AOC,
+    BG2,
+    BMS,
+    CSPROMOD,
+    CSTRIKE,
+    DINODDAY,
+    DOD,
+    DOI,
+    DYSTOPIA,
+    EMPIRES,
+    ESMOD,
+    FAS,
+    FF,
+    FOF,
+    GESOURCE,
+    GMOD9,
+    HIDDEN,
+    HL1MP,
+    HL2CTF,
+    HL2MP,
+    INSURGENCY,
+    IOS,
+    KZ,
+    LEFT4DEAD2,
+    MODULARCOMBAT,
+    NEOTOKYO,
+    NMRIH,
+    NUCLEARDAWN,
+    OBSIDIAN,
+    OPENFORTRESS,
+    PF2,
+    PVKILL,
+    REACTIVEDROP,
+    MKBETA,
+    SHIP,
+    SOURCEFORTS,
+    SYNERGY,
     #[default]
-    #[serde(alias = "tf2", alias = "Tf2")]
-    TF2,
+    #[serde(alias = "tf", alias = "Tf")]
+    TF,
+    TF2CLASSIC,
+    TF2CLASSIFIED,
+    TREASON,
+    ZM,
+    ZPANIC,
 }
 
 impl Game {
-    pub fn mod_folder(&self) -> PathBuf {
+    pub fn mod_folder(&self) -> &Path {
         match self {
-            Game::TF2 => PathBuf::from("tf"),
+            Game::AG2 => todo!(),
+            Game::ALIENSWARM => todo!(),
+            Game::AOC => todo!(),
+            Game::BG2 => todo!(),
+            Game::BMS => todo!(),
+            Game::CSPROMOD => todo!(),
+            Game::CSTRIKE => todo!(),
+            Game::DINODDAY => todo!(),
+            Game::DOD => todo!(),
+            Game::DOI => todo!(),
+            Game::DYSTOPIA => todo!(),
+            Game::EMPIRES => todo!(),
+            Game::ESMOD => todo!(),
+            Game::FAS => todo!(),
+            Game::FF => todo!(),
+            Game::FOF => todo!(),
+            Game::GESOURCE => todo!(),
+            Game::GMOD9 => todo!(),
+            Game::HIDDEN => todo!(),
+            Game::HL1MP => todo!(),
+            Game::HL2CTF => todo!(),
+            Game::HL2MP => todo!(),
+            Game::INSURGENCY => todo!(),
+            Game::IOS => todo!(),
+            Game::KZ => todo!(),
+            Game::LEFT4DEAD2 => todo!(),
+            Game::MODULARCOMBAT => todo!(),
+            Game::NEOTOKYO => todo!(),
+            Game::NMRIH => todo!(),
+            Game::NUCLEARDAWN => todo!(),
+            Game::OBSIDIAN => todo!(),
+            Game::OPENFORTRESS => todo!(),
+            Game::PF2 => todo!(),
+            Game::PVKILL => todo!(),
+            Game::REACTIVEDROP => todo!(),
+            Game::MKBETA => todo!(),
+            Game::SHIP => todo!(),
+            Game::SOURCEFORTS => todo!(),
+            Game::SYNERGY => todo!(),
+            Game::TF => Path::new("tf"),
+            Game::TF2CLASSIC => todo!(),
+            Game::TF2CLASSIFIED => todo!(),
+            Game::TREASON => todo!(),
+            Game::ZM => todo!(),
+            Game::ZPANIC => todo!(),
         }
     }
 }
@@ -30,7 +118,51 @@ impl Game {
 impl Display for Game {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Game::TF2 => write!(f, "Team Fortress 2"),
+            Game::AG2 => todo!(),
+            Game::ALIENSWARM => todo!(),
+            Game::AOC => todo!(),
+            Game::BG2 => todo!(),
+            Game::BMS => todo!(),
+            Game::CSPROMOD => todo!(),
+            Game::CSTRIKE => todo!(),
+            Game::DINODDAY => todo!(),
+            Game::DOD => todo!(),
+            Game::DOI => todo!(),
+            Game::DYSTOPIA => todo!(),
+            Game::EMPIRES => todo!(),
+            Game::ESMOD => todo!(),
+            Game::FAS => todo!(),
+            Game::FF => todo!(),
+            Game::FOF => todo!(),
+            Game::GESOURCE => todo!(),
+            Game::GMOD9 => todo!(),
+            Game::HIDDEN => todo!(),
+            Game::HL1MP => todo!(),
+            Game::HL2CTF => todo!(),
+            Game::HL2MP => todo!(),
+            Game::INSURGENCY => todo!(),
+            Game::IOS => todo!(),
+            Game::KZ => todo!(),
+            Game::LEFT4DEAD2 => todo!(),
+            Game::MODULARCOMBAT => todo!(),
+            Game::NEOTOKYO => todo!(),
+            Game::NMRIH => todo!(),
+            Game::NUCLEARDAWN => todo!(),
+            Game::OBSIDIAN => todo!(),
+            Game::OPENFORTRESS => todo!(),
+            Game::PF2 => todo!(),
+            Game::PVKILL => todo!(),
+            Game::REACTIVEDROP => todo!(),
+            Game::MKBETA => todo!(),
+            Game::SHIP => todo!(),
+            Game::SOURCEFORTS => todo!(),
+            Game::SYNERGY => todo!(),
+            Game::TF => write!(f, "Team Fortress 2"),
+            Game::TF2CLASSIC => todo!(),
+            Game::TF2CLASSIFIED => todo!(),
+            Game::TREASON => todo!(),
+            Game::ZM => todo!(),
+            Game::ZPANIC => todo!(),
         }
     }
 }
@@ -41,12 +173,14 @@ pub struct Package {
     pub create_startup_script: Option<bool>,
     pub startup_opts: Option<templates::StartSh>,
     pub branch: sdk::Branch,
+    pub description: Option<String>,
     pub plugins: Vec<String>,
     pub templates: Option<TemplateSet>,
     pub raw_configs: Option<Vec<SimpleConfig>>,
+    pub plugin_configs: Option<Vec<SimpleConfig>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SimpleConfig {
     pub path: PathBuf,
     pub options: HashMap<String, String>,
@@ -65,17 +199,19 @@ pub struct TemplateSet {
 }
 
 /// Manager is responsible for loading and managing a project using its package configuration file, sm-pkg.yaml.
-pub struct Project {
+pub struct Project<'p> {
     /// Root directory of the project.
-    pub root: PathBuf,
+    project_root: &'p Path,
     pub package: Option<Package>,
+    repo: &'p repo::LocalRepo<'p>,
 }
 
-impl Project {
-    pub fn new(root: PathBuf) -> BoxResult<Self> {
-        println!("🏗️ Using project root {:?}", root);
+impl<'p> Project<'p> {
+    pub fn new(project_root: &'p &Path, repo: &'p repo::LocalRepo) -> BoxResult<Self> {
+        println!("🏗️ Using project root {:?}", project_root);
         Ok(Project {
-            root,
+            project_root,
+            repo,
             package: None,
         })
     }
@@ -105,7 +241,7 @@ impl Project {
     }
 
     pub fn project_file_path(&self) -> PathBuf {
-        self.root.join(PROJECT_FILE)
+        self.project_root.join(PROJECT_FILE)
     }
 
     pub fn save_package_config(&self) -> BoxResult {
@@ -156,7 +292,7 @@ impl Project {
         let branch_opts = vec![sdk::Branch::Stable, sdk::Branch::Dev];
         let branch: Result<sdk::Branch, InquireError> =
             Select::new("👇 Select a metamod/sourcemod branch", branch_opts).prompt();
-        let options: Vec<Game> = vec![Game::TF2];
+        let options: Vec<Game> = vec![Game::TF];
         let game: Result<Game, InquireError> = Select::new("👇 Select a game", options).prompt();
         self.package = match game {
             Ok(choice) => Some(Package {
@@ -164,9 +300,11 @@ impl Project {
                 game: choice,
                 plugins: Vec::new(),
                 templates: None,
+                description: None,
                 raw_configs: None,
                 create_startup_script: None,
                 startup_opts: None,
+                plugin_configs: None,
             }),
             Err(_) => return Err("❗ Failed to select a game".into()),
         };
@@ -200,11 +338,43 @@ impl Project {
             self.write_startup_script(&pkg.startup_opts)?
         }
 
+        for plugin in &pkg.plugins {
+            let def = self.repo.find_plugin_definition(plugin)?;
+            self.write_plugin_config(&def)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_plugin_config(&self, def: &plugins::Definition) -> BoxResult {
+        let mut base_configs = match &def.configs {
+            Some(configs) => configs.clone(),
+            None => return Ok(()),
+        };
+
+        let local_configs = match &self.package {
+            Some(p) => match &p.plugin_configs {
+                None => &Vec::new(),
+                Some(configs) => configs,
+            },
+            None => return Ok(()),
+        };
+
+        for base_config in base_configs.iter_mut() {
+            if let Some(local_config) = local_configs.iter().find(|c| c.path == base_config.path) {
+                for (k, v) in local_config.options.iter() {
+                    base_config.options.insert(k.clone(), v.clone());
+                }
+            }
+
+            self.write_raw_configs(&vec![base_config.clone()])?;
+        }
+
         Ok(())
     }
 
     fn write_startup_script(&self, config: &Option<templates::StartSh>) -> BoxResult {
-        let script_path = self.root.join("start.sh");
+        let script_path = self.project_root.join("start.sh");
         match &config {
             None => Err("No startup_opts definition found".into()),
             Some(template) => match write_cfg(&TagFormat::Shell, &script_path, template) {
@@ -221,7 +391,7 @@ impl Project {
 
     fn write_raw_configs(&self, raw_configs: &Vec<SimpleConfig>) -> BoxResult {
         for raw_config in raw_configs {
-            let out_path = self.root.join(&raw_config.path);
+            let out_path = self.project_root.join(&raw_config.path);
             let mut file = File::create(&out_path)?;
             write_tag(&TagFormat::Ini, &mut file)?;
             for (key, value) in &raw_config.options {
@@ -237,7 +407,7 @@ impl Project {
         if let Some(template) = &config {
             write_cfg(
                 &TagFormat::Ini,
-                &self.root.join("tf/cfg/sourcemod/sourcemod.cfg"),
+                &self.project_root.join("tf/cfg/sourcemod/sourcemod.cfg"),
                 template,
             )?;
         }
@@ -249,7 +419,9 @@ impl Project {
         if let Some(template) = &config {
             write_cfg(
                 &TagFormat::Ini,
-                &self.root.join("tf/addons/sourcemod/configs/core.cfg"),
+                &self
+                    .project_root
+                    .join("tf/addons/sourcemod/configs/core.cfg"),
                 template,
             )?;
         }
@@ -261,7 +433,9 @@ impl Project {
         if let Some(template) = &config {
             write_cfg(
                 &TagFormat::Ini,
-                &self.root.join("tf/addons/sourcemod/configs/databases.cfg"),
+                &self
+                    .project_root
+                    .join("tf/addons/sourcemod/configs/databases.cfg"),
                 template,
             )?
         }
@@ -273,7 +447,9 @@ impl Project {
         if let Some(template) = &config {
             write_cfg(
                 &TagFormat::Ini,
-                &self.root.join("tf/addons/sourcemod/configs/maplists.cfg"),
+                &self
+                    .project_root
+                    .join("tf/addons/sourcemod/configs/maplists.cfg"),
                 template,
             )?;
         }
@@ -286,7 +462,7 @@ impl Project {
             write_cfg(
                 &TagFormat::Ini,
                 &self
-                    .root
+                    .project_root
                     .join("tf/addons/sourcemod/configs/admins_simple.ini"),
                 template,
             )?
@@ -299,7 +475,9 @@ impl Project {
         if let Some(template) = &config {
             write_cfg(
                 &TagFormat::Ini,
-                &self.root.join("tf/addons/sourcemod/configs/admins.cfg"),
+                &self
+                    .project_root
+                    .join("tf/addons/sourcemod/configs/admins.cfg"),
                 template,
             )?
         }
@@ -312,7 +490,7 @@ impl Project {
             write_cfg(
                 &TagFormat::Ini,
                 &self
-                    .root
+                    .project_root
                     .join("tf/addons/sourcemod/configs/admin_groups.cfg"),
                 template,
             )?
@@ -329,7 +507,7 @@ impl Project {
             write_cfg(
                 &TagFormat::Ini,
                 &self
-                    .root
+                    .project_root
                     .join("tf/addons/sourcemod/configs/admin_overrides.cfg"),
                 template,
             )?
