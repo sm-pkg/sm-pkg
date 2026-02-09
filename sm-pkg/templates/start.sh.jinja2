@@ -1,0 +1,17 @@
+bash {%- if let Some(v) = use_64bit %}{% if v %}./srcds_run_64{% else %}"./srcds_run"{% endif %} {% endif %} -game "{{mod_folder}}" -console \
+  -strictportbind \
+  -usercon \
+  -secured \
+  -port "{%- if let Some(v) = port %}{{ v }}{% else %}27015{% endif %}" \
+  {%- if let Some(v) = tv_port %} +tv_port "{{ v }}" \ {% endif %}
+  {%- if let Some(v) = client_port %} +clientport "{{ v }}" \ {% endif %}
+  {%- if let Some(v) = unrestricted_max_players %} {% if v %}-unrestricted_maxplayers {% endif %}{% endif %}
+  {%- if let Some(v) = max_players %} +maxplayers {{ v }} \ {% endif %}
+   +map "{%- if let Some(v) = map %}{{ v }}{% else %}pl_badwater{% endif %}" \
+  {%- if let Some(v) = gslt %} +sv_setsteamaccount "{{ v }}" {% endif %} \
+  {%- if let Some(v) = rcon_password %} +rcon_password "{{ v }}"  {% endif %} \
+  {%- if let Some(v) = sv_password %} +sv_password "{{ v }}" \ {% endif %} \
+  {%- if let Some(v) = region %} +sv_region "{{ v }}" {% endif %} \
+  {%- if let Some(v) = ip %} +ip {{ v }} \ {% endif %} \
+  {%- if let Some(v) = sdr_enable %} {% if v %}-enablefakeip{% endif %}  {% endif %} \
+  {%- if let Some(v) = workshop_authkey %} -authkey "{{ v }}" {% endif %}

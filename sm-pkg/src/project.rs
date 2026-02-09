@@ -170,13 +170,19 @@ impl Display for Game {
 #[derive(Serialize, Deserialize)]
 pub struct Package {
     pub game: Game,
-    pub create_startup_script: Option<bool>,
-    pub startup_opts: Option<templates::StartSh>,
     pub branch: sdk::Branch,
-    pub description: Option<String>,
     pub plugins: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_startup_script: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub startup_opts: Option<templates::StartSh>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub templates: Option<TemplateSet>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_configs: Option<Vec<SimpleConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub plugin_configs: Option<Vec<SimpleConfig>>,
 }
 
@@ -188,13 +194,21 @@ pub struct SimpleConfig {
 
 #[derive(Serialize, Deserialize)]
 pub struct TemplateSet {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sourcemod_cfg: Option<templates::SourcemodCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub maplists_cfg: Option<templates::MaplistsCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub databases_cfg: Option<templates::DatabasesCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub core_cfg: Option<templates::CoreCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub admins_simple_ini: Option<templates::AdminsSimpleIni>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub admins_cfg: Option<templates::AdminsCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub admin_groups_cfg: Option<templates::AdminGroupsCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub admin_overrides_cfg: Option<templates::AdminOverridesCfg>,
 }
 
@@ -261,6 +275,21 @@ impl<'p> Project<'p> {
             Some(ref config) => config
                 .plugins
                 .contains(&plugin_name.to_string().to_lowercase()),
+        }
+    }
+
+    pub fn remove_plugin(&mut self, plugin: plugins::Definition) -> BoxResult {
+        if !self.has_plugin(&plugin.name) {
+            return Err("❗ Plugin doesnt exists in project".into());
+        }
+
+        match &mut self.package {
+            Some(config) => {
+                config.plugins.retain(|p| p != &plugin.name);
+                println!("✅ Plugin Removed {}", plugin.name);
+                Ok(())
+            }
+            None => Err("❗ No plugin found?".into()),
         }
     }
 
