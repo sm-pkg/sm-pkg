@@ -129,4 +129,19 @@ impl<'a> LocalRepo<'a> {
 
         Err(format!("Plugin not found: {}", plugin).into())
     }
+
+    pub fn plugins(&self) -> BoxResult<Vec<plugins::Definition>> {
+        let mut valid_definitions: Vec<plugins::Definition> = Vec::new();
+        for known_plugin in self.read_index()? {
+            let mut plugin = known_plugin.clone();
+            plugin.path = Some(
+                self.root
+                    .join(format!("repo/{}/src/scripting", &plugin.name))
+                    .to_path_buf(),
+            );
+            valid_definitions.push(plugin);
+        }
+
+        Ok(valid_definitions)
+    }
 }
