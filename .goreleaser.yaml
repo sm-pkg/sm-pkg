@@ -49,7 +49,7 @@ release:
   github:
     owner: sm-pkg
     name: sm-pkg
-  draft: true
+  draft: false
   replace_existing_draft: true
   use_existing_draft: true
   replace_existing_artifacts: true
