@@ -3,7 +3,7 @@ members = ["sm-pkg", "sm-pkg-bin"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.3"
 description = "A sourcemod package manager"
 readme = "README.md"
 license = "MIT"
