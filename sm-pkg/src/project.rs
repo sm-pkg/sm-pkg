@@ -263,7 +263,12 @@ impl<'p> Project<'p> {
             Some(ref config) => config,
             None => return Err("❗ No config?".into()),
         };
-        let file = File::create(self.project_file_path())?;
+        let mut file = File::create(self.project_file_path())?;
+        writeln!(
+            file,
+            "# yaml-language-server: $schema=https://raw.githubusercontent.com/sm-pkg/sm-pkg/refs/heads/master/schema/sm-pkg.json"
+        )?;
+        writeln!(file, "---")?;
         serde_yaml::to_writer(file, &config)?;
 
         Ok(())
