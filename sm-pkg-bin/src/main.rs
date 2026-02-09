@@ -8,10 +8,12 @@ use sm_pkg::{
     sdk::{self, Branch, Runtime},
 };
 use std::{
-    fs::{self, File},
     io,
     path::{Path, PathBuf},
 };
+
+#[cfg(feature = "repo")]
+use std::fs::{self, File};
 
 //const DEFAULT_OUTPUT: &str = "./output";
 
@@ -109,8 +111,17 @@ enum Commands {
         #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Other)]
         runtime: Runtime,
     },
+
+    #[cfg(feature = "repo")]
     #[command(about = "Rebuild the package index in the local directory")]
     BuildIndex {},
+
+    #[cfg(feature = "repo")]
+    #[command(about = "Build all plugins")]
+    BuildAll {
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Unknown)]
+        branch: Branch,
+    },
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -166,33 +177,11 @@ async fn run() -> BoxResult {
         Commands::Install { project_root } => {
             package_install(&app_root_resolved, &project_root).await
         }
+        #[cfg(feature = "repo")]
         Commands::BuildIndex {} => build_index().await,
+        #[cfg(feature = "repo")]
+        Commands::BuildAll { branch } => build_all_plugins(&app_root_resolved, &branch).await,
     }
-}
-
-async fn build_index() -> BoxResult {
-    let mut specs: Vec<plugins::Definition> = vec![];
-    for name in fs::read_dir(".")? {
-        let fp = match name {
-            Err(_) => continue,
-            Ok(p) => p.path().join(plugins::PLUGIN_DEFINITION_FILE),
-        };
-        if !fp.exists() {
-            continue;
-        }
-        let definition: plugins::Definition = serde_yaml::from_reader(File::open(fp)?)?;
-        specs.push(definition);
-    }
-
-    let mut output = File::create(repo::INDEX_FILE)?;
-    serde_yaml::to_writer(&mut output, &specs)?;
-
-    println!(
-        "✅ Package index built successfully. Found {} packages.",
-        specs.len()
-    );
-
-    Ok(())
 }
 
 async fn plugin_build(
@@ -364,4 +353,64 @@ fn print_completions<G: clap_complete::Generator>(generator: G, cmd: &mut clap::
         cmd.get_name().to_string(),
         &mut io::stdout(),
     );
+}
+
+#[cfg(feature = "repo")]
+async fn build_index() -> BoxResult {
+    let mut specs: Vec<plugins::Definition> = vec![];
+    for name in fs::read_dir(".")? {
+        let fp = match name {
+            Err(_) => continue,
+            Ok(p) => p.path().join(plugins::PLUGIN_DEFINITION_FILE),
+        };
+        if !fp.exists() {
+            continue;
+        }
+        let definition: plugins::Definition = serde_yaml::from_reader(File::open(fp)?)?;
+        specs.push(definition);
+    }
+
+    let mut output = File::create(repo::INDEX_FILE)?;
+    serde_yaml::to_writer(&mut output, &specs)?;
+
+    println!(
+        "✅ Package index built successfully. Found {} packages.",
+        specs.len()
+    );
+
+    Ok(())
+}
+
+#[cfg(feature = "repo")]
+async fn build_all_plugins(root_path: &Path, branch: &Branch) -> BoxResult {
+    let repo = repo::LocalRepo::new(root_path);
+    let sdk_manager = sdk::Manager::new(root_path);
+    let sdk_env = sdk_manager.get_sdk_env(branch)?;
+    let build_root = create_build_root(root_path)?;
+
+    let mut errors = 0;
+
+    for plugin_def in repo.plugins()? {
+        match plugins::build(
+            root_path,
+            &sdk_env,
+            &build_root,
+            &repo,
+            &vec![plugin_def.name],
+        ) {
+            Err(e) => {
+                errors += 1;
+                eprintln!("❌ Failed to build plugin: {}", e);
+            }
+            Ok(_) => {
+                println!("✅ Plugins built successfully: {}", build_root.display());
+            }
+        };
+    }
+
+    if errors > 0 {
+        Err("❌ Failed to build {errors} plugins".into())
+    } else {
+        Ok(())
+    }
 }
