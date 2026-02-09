@@ -50,7 +50,7 @@ pub fn build(
     for plugin in repo.find_plugin_definitions(plugins)? {
         let src_tree = app_root.join("repo").join(&plugin.name).join("src");
         let build_dir = build_root.join(&plugin.name);
-        create_dir_all(&build_dir)?;
+        create_dir_all(&build_dir.join("include"))?;
         fsutil::copy_dir_all(src_tree, &build_dir)?;
 
         if let Some(deps) = &plugin.dependencies {
@@ -70,7 +70,6 @@ pub fn build(
                 fsutil::copy_dir_all(inc_tree, &include_dir)?;
             }
         }
-
         let mut args = sdk_env.args();
         args.active_dir = Some(build_dir.join("scripting"));
         // The path must be a full absolute path

@@ -268,7 +268,11 @@ impl Environment {
 
         match default_include_path(&self.sdk_root) {
             Ok(include) => args.include(include),
-            Err(e) => eprintln!("Cannot find default include path: {}", e),
+            Err(e) => eprintln!(
+                "Cannot find default include path: {} | {}",
+                e,
+                self.sdk_root.display()
+            ),
         }
 
         args.include(

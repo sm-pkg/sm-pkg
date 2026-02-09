@@ -396,20 +396,18 @@ async fn build_all_plugins(root_path: &Path, branch: &Branch) -> BoxResult {
             &sdk_env,
             &build_root,
             &repo,
-            &vec![plugin_def.name],
+            &vec![plugin_def.name.clone()],
         ) {
             Err(e) => {
                 errors += 1;
-                eprintln!("❌ Failed to build plugin: {}", e);
+                eprintln!("❌ Failed to build plugin: {} - {}", e, &plugin_def.name);
             }
-            Ok(_) => {
-                println!("✅ Plugins built successfully: {}", build_root.display());
-            }
+            Ok(_) => continue,
         };
     }
 
     if errors > 0 {
-        Err("❌ Failed to build {errors} plugins".into())
+        Err(format!("❌ Failed to build {} plugins", errors).into())
     } else {
         Ok(())
     }
