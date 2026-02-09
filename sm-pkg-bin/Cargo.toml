@@ -14,7 +14,7 @@ repo = []
 [dependencies]
 clap = { version = "4.5.57", features = ["derive", "color", "env"] }
 resolve-path = "0.1.0"
-sm-pkg = { path = "../sm-pkg" }
+sm-pkg = { path = "../sm-pkg", version = "0.1.3" }
 serde_yaml = "0.9.34"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
 clap_complete = "4.5.65"
