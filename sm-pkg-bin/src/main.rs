@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use clap_complete;
 use resolve_path::PathResolveExt;
 use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil,
@@ -9,75 +10,80 @@ use sm_pkg::{
 };
 use std::{
     fs::{self, File},
+    io,
     path::{Path, PathBuf},
 };
 
 //const DEFAULT_OUTPUT: &str = "./output";
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
+#[command(name = "completion-derive")]
 struct Cli {
     #[arg(short, long, default_value = DEFAULT_ROOT)]
     app_root: Option<PathBuf>,
 
+    #[arg(long = "generate", value_enum)]
+    generator: Option<clap_complete::Shell>,
+
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 enum Commands {
     #[command(about = "Initialize a new project")]
     Init {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
     },
     #[command(about = "Install all project dependencies")]
     Install {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
     },
     #[command(about = "Add one or more plugins to a project")]
     Add {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
 
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Unknown)]
         plugins: Vec<String>,
     },
     #[command(about = "Remove one or more plugins from a project")]
     Remove {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
 
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Unknown)]
         plugins: Vec<String>,
     },
 
     #[command(about = "Generate configuration files")]
     Config {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
     },
 
     #[command(about = "List configured project pacakges")]
     List {
-        #[arg(short, long, default_value = ".")]
+        #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
         project_root: PathBuf,
     },
     #[command(about = "Search package cache", arg_required_else_help = true)]
     Search {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Unknown)]
         query: String,
     },
 
     #[command(about = "Build one or more plugins", arg_required_else_help = true)]
     Build {
-        #[arg(required = true)]
+        #[arg(required = true, value_hint = ValueHint::Unknown)]
         plugins: Vec<String>,
 
-        #[arg(short, long, default_value_t, value_enum)]
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Unknown)]
         branch: Branch,
 
-        #[arg(short('r'), long)]
+        #[arg(short('r'), long, value_hint = ValueHint::DirPath)]
         build_root: Option<PathBuf>,
     },
 
@@ -86,10 +92,10 @@ enum Commands {
 
     #[command(about = "Download and install sourcemod")]
     SDKInstall {
-        #[arg(short, long, default_value_t, value_enum)]
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Other)]
         branch: Branch,
 
-        #[arg(short, long, default_value_t, value_enum)]
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Other)]
         runtime: Runtime,
     },
 
@@ -98,10 +104,10 @@ enum Commands {
 
     #[command(about = "Fetches the latest version of sourcemod for a branch")]
     SDKLatest {
-        #[arg(short, long, default_value_t, value_enum)]
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Other)]
         branch: Branch,
 
-        #[arg(short, long, default_value_t, value_enum)]
+        #[arg(short, long, default_value_t, value_enum, value_hint = ValueHint::Other)]
         runtime: Runtime,
     },
     #[command(about = "Rebuild the package index in the local directory")]
@@ -116,6 +122,11 @@ async fn main() -> BoxResult {
 async fn run() -> BoxResult {
     println!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
+    if let Some(generator) = args.generator {
+        let mut cmd = Cli::command();
+        print_completions(generator, &mut cmd);
+        return Ok(());
+    }
     let app_root = args.app_root.expect("No app_root path specified");
     let app_root_resolved = app_root.try_resolve()?.to_path_buf();
 
@@ -241,11 +252,15 @@ async fn package_list(app_root: &Path, project_root: &Path) -> BoxResult {
     Ok(())
 }
 
-async fn package_remove(
-    _app_root: &Path,
-    _project_root: &PathBuf,
-    _plugins: Vec<String>,
-) -> BoxResult {
+async fn package_remove(app_root: &Path, project_root: &Path, plugins: Vec<String>) -> BoxResult {
+    let repo = repo::LocalRepo::new(app_root);
+    let mut project_manager = project::Project::new(&project_root, &repo)?;
+    project_manager.open()?;
+
+    for plugin in plugins {
+        project_manager.remove_plugin(repo.find_plugin_definition(&plugin)?)?;
+    }
+
     Ok(())
 }
 
@@ -339,4 +354,13 @@ async fn sdk_latest(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResul
 async fn sdk_install(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResult {
     let sdk_manager = sdk::Manager::new(root);
     sdk_manager.install_sdk(runtime, branch).await
+}
+
+fn print_completions<G: clap_complete::Generator>(generator: G, cmd: &mut clap::Command) {
+    clap_complete::generate(
+        generator,
+        cmd,
+        cmd.get_name().to_string(),
+        &mut io::stdout(),
+    );
 }

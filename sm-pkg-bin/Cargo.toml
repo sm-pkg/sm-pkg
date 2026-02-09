@@ -11,6 +11,7 @@ resolve-path = "0.1.0"
 sm-pkg = { path = "../sm-pkg" }
 serde_yaml = "0.9.34"
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
+clap_complete = "4.5.65"
 
 [[bin]]
 name = "sm-pkg"
