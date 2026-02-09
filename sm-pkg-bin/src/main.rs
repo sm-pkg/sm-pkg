@@ -1,5 +1,4 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
-use clap_complete;
 use resolve_path::PathResolveExt;
 use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil,
@@ -260,6 +259,8 @@ async fn package_remove(app_root: &Path, project_root: &Path, plugins: Vec<Strin
     for plugin in plugins {
         project_manager.remove_plugin(repo.find_plugin_definition(&plugin)?)?;
     }
+
+    project_manager.save_package_config()?;
 
     Ok(())
 }

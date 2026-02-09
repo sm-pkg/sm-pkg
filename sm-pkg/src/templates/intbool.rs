@@ -13,8 +13,8 @@ impl Serialize for IntBool {
         S: serde::Serializer,
     {
         match self {
-            IntBool::False => serializer.serialize_u8(0),
-            IntBool::True => serializer.serialize_u8(1),
+            IntBool::False => serializer.serialize_bool(false),
+            IntBool::True => serializer.serialize_bool(true),
         }
     }
 }

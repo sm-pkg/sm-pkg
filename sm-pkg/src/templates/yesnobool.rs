@@ -13,8 +13,8 @@ impl Serialize for YesNoBool {
         S: serde::Serializer,
     {
         match self {
-            YesNoBool::False => serializer.serialize_str("no"),
-            YesNoBool::True => serializer.serialize_str("yes"),
+            YesNoBool::False => serializer.serialize_bool(false),
+            YesNoBool::True => serializer.serialize_bool(true),
         }
     }
 }
