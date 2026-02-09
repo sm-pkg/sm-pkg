@@ -54,7 +54,7 @@ impl std::fmt::Display for ImmunityMode {
 
 #[derive(Template, Serialize, Deserialize, Debug)]
 #[template(
-    path = "tf/cfg/sourcemod/sourcemod.cfg.jinja2",
+    path = "cfg/sourcemod/sourcemod.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -80,7 +80,7 @@ pub struct SourcemodCfg {
 
 #[derive(Template, Serialize, Deserialize, Debug)]
 #[template(
-    path = "tf/addons/sourcemod/configs/core.cfg.jinja2",
+    path = "addons/sourcemod/configs/core.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -120,7 +120,7 @@ pub struct SourcemodDatabase {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/databases.cfg.jinja2",
+    path = "addons/sourcemod/configs/databases.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -131,7 +131,7 @@ pub struct DatabasesCfg {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/maplists.cfg.jinja2",
+    path = "addons/sourcemod/configs/maplists.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -149,7 +149,7 @@ pub struct SourcemodSimpleAdmin {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/admins_simple.ini.jinja2",
+    path = "addons/sourcemod/configs/admins_simple.ini.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -170,7 +170,7 @@ pub struct SourcemodAdmin {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/admins.cfg.jinja2",
+    path = "addons/sourcemod/configs/admins.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -194,7 +194,7 @@ pub struct AdminGroup {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/admin_groups.cfg.jinja2",
+    path = "addons/sourcemod/configs/admin_groups.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -211,7 +211,7 @@ pub struct AdminOverride {
 
 #[derive(Template, Serialize, Deserialize)]
 #[template(
-    path = "tf/addons/sourcemod/configs/admin_overrides.cfg.jinja2",
+    path = "addons/sourcemod/configs/admin_overrides.cfg.jinja2",
     ext = "txt",
     whitespace = "suppress"
 )]
@@ -220,8 +220,9 @@ pub struct AdminOverridesCfg {
 }
 
 #[derive(Template, Serialize, Deserialize)]
-#[template(path = "tf/start.sh.jinja2", ext = "txt", whitespace = "suppress")]
+#[template(path = "start.sh.jinja2", ext = "txt")]
 pub struct StartSh {
+    pub use_64bit: Option<bool>,
     pub mod_folder: String,
     pub port: Option<u16>,
     pub tv_port: Option<u16>,

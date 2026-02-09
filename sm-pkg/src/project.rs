@@ -264,6 +264,21 @@ impl<'p> Project<'p> {
         }
     }
 
+    pub fn remove_plugin(&mut self, plugin: plugins::Definition) -> BoxResult {
+        if !self.has_plugin(&plugin.name) {
+            return Err("❗ Plugin doesnt exists in project".into());
+        }
+
+        match &mut self.package {
+            Some(config) => {
+                config.plugins.retain(|p| p != &plugin.name);
+                println!("✅ Plugin Removed {}", plugin.name);
+                Ok(())
+            }
+            None => Err("❗ No plugin found?".into()),
+        }
+    }
+
     pub fn add_plugin(&mut self, plugin: plugins::Definition) -> BoxResult {
         if self.has_plugin(&plugin.name) {
             return Err("❗ Plugin already exists".into());
