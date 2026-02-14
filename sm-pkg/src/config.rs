@@ -1,10 +1,8 @@
-use crate::{BoxResult, sdk};
+use crate::{BoxResult, CONFIG_FILE_PATH, sdk};
 use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::{fs::File, path::PathBuf};
-
-const CONFIG_FILE_PATH: &str = "~/.sm-pkg/config.yaml";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {

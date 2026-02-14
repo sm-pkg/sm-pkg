@@ -1,4 +1,4 @@
-use crate::{BoxResult, plugins};
+use crate::{BoxResult, DL_CACHE, plugins};
 use flate2::read::GzDecoder;
 use reqwest::Error;
 use resolve_path::PathResolveExt;
@@ -12,8 +12,6 @@ use std::{
     process::Command,
 };
 use tar::Archive;
-
-const DL_CACHE: &str = "dl_cache";
 
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Default)]
 pub enum Runtime {
@@ -125,9 +123,9 @@ impl<'a> Manager<'a> {
     }
 
     pub async fn install_sourcemod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
-        println!("⏳ Fetching latest version... ");
+        info!("⏳ Fetching latest version... ");
         let latest_version = Self::fetch_latest_sourcemod_build(self, branch).await?;
-        println!("🔎 Found: {latest_version}");
+        info!("🔎 Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
             let target = format!(
@@ -135,7 +133,7 @@ impl<'a> Manager<'a> {
                 self.get_sdk_branch_version(&Runtime::Sourcemod, branch),
                 &latest_version
             );
-            println!("💾 Downlading sourcemod sdk: {target}...");
+            info!("💾 Downlading sourcemod sdk: {target}...");
             let mut of = File::create(&archive_path)?;
             self.fetch_archive(target, &mut of).await?;
         }
@@ -146,9 +144,9 @@ impl<'a> Manager<'a> {
     }
 
     pub async fn install_metamod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
-        println!("⏳ Fetching latest version... ");
+        info!("⏳ Fetching latest version... ");
         let latest_version = Self::fetch_latest_metamod_build(self, branch).await?;
-        println!("🔎 Found: {latest_version}");
+        info!("🔎 Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
             let target = format!(
@@ -156,7 +154,7 @@ impl<'a> Manager<'a> {
                 self.get_sdk_branch_version(&Runtime::Metamod, branch),
                 &latest_version
             );
-            println!("💾 Downlading metamod sdk: {target}...");
+            info!("💾 Downlading metamod sdk: {target}...");
             let mut of = File::create(&archive_path)?;
             self.fetch_archive(target, &mut of).await?;
         }
@@ -167,7 +165,7 @@ impl<'a> Manager<'a> {
     }
 
     fn extract_archive(&self, archive_path: &PathBuf, out_path: &PathBuf) -> BoxResult {
-        println!("📤 Extracting into: {:?}...", out_path);
+        info!("📤 Extracting into: {:?}...", out_path);
         let input_archive = File::open(archive_path)?;
         let mut archive = Archive::new(GzDecoder::new(&input_archive));
         archive.unpack(out_path)?;
@@ -205,15 +203,15 @@ impl<'a> Manager<'a> {
                 Some(latest_sdk) => {
                     let sm_root = self.app_root.join("sdks").join(path::Path::new(latest_sdk));
                     let current_root = self.app_root.join("sdks/current");
-                    println!("⭐ Activating {latest_sdk} @ {current_root:?}");
+                    info!("⭐ Activating {latest_sdk} @ {current_root:?}");
 
                     if current_root.exists() {
                         remove_file(&current_root)?;
                     }
 
                     symlink(sm_root, &current_root)?;
-                    println!("✅ SDK activated successfully");
-                    println!(
+                    info!("✅ SDK activated successfully");
+                    info!(
                         "🚨 You probably want to add {:?} to your $PATH if you have not already",
                         current_root.join("addons/sourcemod/scripting")
                     );

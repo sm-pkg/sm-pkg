@@ -1,7 +1,7 @@
 use crate::{
     BoxResult, fsutil,
     project::{Game, SimpleConfig},
-    repo::LocalRepo,
+    repo::PluginDefinitionProvider,
     sdk,
 };
 use serde::{Deserialize, Serialize};
@@ -11,8 +11,6 @@ use std::{
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
-
-pub const PLUGIN_DEFINITION_FILE: &str = "plugin.yaml";
 
 /// Definition of a plugin.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -43,7 +41,7 @@ pub fn build(
     app_root: &Path,
     sdk_env: &sdk::Environment,
     build_root: &Path,
-    repo: &LocalRepo,
+    repo: &dyn PluginDefinitionProvider,
     plugins: &Vec<String>,
 ) -> BoxResult<Vec<PathBuf>> {
     let mut outputs = Vec::new();
@@ -66,7 +64,7 @@ pub fn build(
                         format!("Dependency include directory not found: {:?}", inc_tree).into(),
                     );
                 }
-                println!("➕ Adding {} includes", dep);
+                debug!("➕ Adding {} includes", dep);
                 fsutil::copy_dir_all(inc_tree, &include_dir)?;
             }
         }
