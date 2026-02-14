@@ -199,7 +199,7 @@ async fn run() -> BoxResult {
 
 async fn plugin_build(
     app_root: &Path,
-    plugins: &Vec<String>,
+    plugins: &[String],
     branch: &Branch,
     build_root_option: Option<PathBuf>,
 ) -> BoxResult {
@@ -259,7 +259,7 @@ async fn package_remove(app_root: &Path, project_root: &Path, plugins: Vec<Strin
     project_manager.open()?;
 
     plugins.iter().try_for_each(|p| -> BoxResult {
-        let def = repo.find_plugin_definition(&p)?;
+        let def = repo.find_plugin_definition(p)?;
         project_manager.remove_plugin(def)?;
         Ok(())
     })?;
