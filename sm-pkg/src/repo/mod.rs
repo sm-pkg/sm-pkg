@@ -9,9 +9,8 @@ use std::{
 };
 
 pub trait PluginDefinitionProvider<'a> {
-    fn find_plugin_definitions(&self, plugins: &Vec<String>)
-    -> BoxResult<Vec<plugins::Definition>>;
-    fn find_plugin_definition(&self, plugin: &String) -> BoxResult<plugins::Definition>;
+    fn find_plugin_definitions(&self, plugins: &[String]) -> BoxResult<Vec<plugins::Definition>>;
+    fn find_plugin_definition(&self, plugin: &str) -> BoxResult<plugins::Definition>;
 }
 
 pub struct LocalRepo<'a> {
@@ -106,10 +105,7 @@ impl<'a> LocalRepo<'a> {
 }
 
 impl<'a> PluginDefinitionProvider<'a> for LocalRepo<'a> {
-    fn find_plugin_definitions(
-        &self,
-        plugins: &Vec<String>,
-    ) -> BoxResult<Vec<plugins::Definition>> {
+    fn find_plugin_definitions(&self, plugins: &[String]) -> BoxResult<Vec<plugins::Definition>> {
         let packages = self.read_index()?;
         let mut valid_definitions: Vec<plugins::Definition> = Vec::new();
         for plugin in plugins {
@@ -135,19 +131,19 @@ impl<'a> PluginDefinitionProvider<'a> for LocalRepo<'a> {
         Ok(valid_definitions)
     }
 
-    fn find_plugin_definition(&self, plugin: &String) -> BoxResult<plugins::Definition> {
+    fn find_plugin_definition(&self, plugin: &str) -> BoxResult<plugins::Definition> {
         match self
             .read_index()?
             .iter()
             .find(|d| d.name == *plugin)
-            .and_then(|f| {
+            .map(|f| {
                 let mut plugin = f.clone();
                 plugin.path = Some(
                     self.root
                         .join(format!("repo/{}/src/scripting", &plugin.name))
                         .to_path_buf(),
                 );
-                Some(plugin)
+                plugin
             }) {
             None => Err(format!("Plugin not found: {}", plugin).into()),
             Some(plugin) => Ok(plugin),

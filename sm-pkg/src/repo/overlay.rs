@@ -2,16 +2,9 @@ use crate::{BoxResult, plugins, repo::PluginDefinitionProvider};
 
 /// PluginOverlays is a collection of PluginDefinitionProviders, prioritized by order of insertion,
 /// last to first..
+#[derive(Default)]
 pub struct PluginOverlays<'a> {
     overlays: Vec<Box<dyn PluginDefinitionProvider<'a>>>,
-}
-
-impl<'a> Default for PluginOverlays<'a> {
-    fn default() -> Self {
-        PluginOverlays {
-            overlays: Vec::new(),
-        }
-    }
 }
 
 impl<'a> PluginOverlays<'a> {
@@ -22,10 +15,7 @@ impl<'a> PluginOverlays<'a> {
 }
 
 impl<'a> PluginDefinitionProvider<'a> for PluginOverlays<'a> {
-    fn find_plugin_definitions(
-        &self,
-        _plugins: &Vec<String>,
-    ) -> BoxResult<Vec<plugins::Definition>> {
+    fn find_plugin_definitions(&self, _plugins: &[String]) -> BoxResult<Vec<plugins::Definition>> {
         let mut definitions = Vec::new();
         for overlay in &self.overlays {
             definitions.extend(overlay.find_plugin_definitions(_plugins)?);
@@ -33,7 +23,7 @@ impl<'a> PluginDefinitionProvider<'a> for PluginOverlays<'a> {
         Ok(definitions)
     }
 
-    fn find_plugin_definition(&self, plugin: &String) -> BoxResult<plugins::Definition> {
+    fn find_plugin_definition(&self, plugin: &str) -> BoxResult<plugins::Definition> {
         for overlay in &self.overlays {
             if let Ok(def) = overlay.find_plugin_definition(plugin) {
                 return Ok(def);

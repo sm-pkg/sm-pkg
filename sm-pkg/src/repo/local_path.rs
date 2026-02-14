@@ -16,7 +16,7 @@ impl<'a> PathOverlay<'a> {
 }
 
 impl<'a> PluginDefinitionProvider<'a> for PathOverlay<'a> {
-    fn find_plugin_definition(&self, plugin: &String) -> BoxResult<plugins::Definition> {
+    fn find_plugin_definition(&self, plugin: &str) -> BoxResult<plugins::Definition> {
         let definition_path = self.root_path.join(plugin).join(PLUGIN_DEFINITION_FILE);
         if !definition_path.exists() {
             return Err(format!(
@@ -29,10 +29,7 @@ impl<'a> PluginDefinitionProvider<'a> for PathOverlay<'a> {
         Err("...".into())
     }
 
-    fn find_plugin_definitions(
-        &self,
-        _plugins: &Vec<String>,
-    ) -> BoxResult<Vec<plugins::Definition>> {
+    fn find_plugin_definitions(&self, _plugins: &[String]) -> BoxResult<Vec<plugins::Definition>> {
         todo!()
     }
 }

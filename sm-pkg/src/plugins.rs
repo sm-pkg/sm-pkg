@@ -42,7 +42,7 @@ pub fn build(
     sdk_env: &sdk::Environment,
     build_root: &Path,
     repo: &dyn PluginDefinitionProvider,
-    plugins: &Vec<String>,
+    plugins: &[String],
 ) -> BoxResult<Vec<PathBuf>> {
     let mut outputs = Vec::new();
     for plugin in repo.find_plugin_definitions(plugins)? {
