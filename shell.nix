@@ -25,5 +25,6 @@ pkgs.mkShell {
     just
     nil
     nixd
+    cargo-machete
   ];
 }
