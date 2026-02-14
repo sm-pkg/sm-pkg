@@ -10,11 +10,14 @@ license.workspace = true
 archive = "0.3.0"
 askama = "0.15.4"
 chrono = "0.4.43"
-clap = { version = "4.5.57", features = ["derive", "color", "env"] }
+clap = { version = "4.5.58", features = ["derive", "color", "env"] }
+env_logger = "0.11.9"
 flate2 = { version = "1.1.9", features = ["zlib-rs"] }
 inquire = "0.9.3"
+log = "0.4.29"
 reqwest = { version = "0.13.2", features = ["json", "rustls"] }
 resolve-path = "0.1.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 tar = "0.4.44"
+tracing = { version = "0.1.44", features = ["log"] }

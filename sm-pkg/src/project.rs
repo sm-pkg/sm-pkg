@@ -1,4 +1,5 @@
-use crate::{BoxResult, VERSION, plugins, repo, sdk, templates};
+use crate::repo::PluginDefinitionProvider;
+use crate::{BoxResult, PROJECT_FILE, VERSION, plugins, sdk, templates};
 use askama::Template;
 use inquire::{InquireError, Select};
 use serde::{Deserialize, Serialize};
@@ -7,8 +8,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::{collections::HashMap, fmt::Display, fs::File, path::PathBuf};
 use std::{fmt, fs};
-
-pub const PROJECT_FILE: &str = "sm-pkg.yaml";
 
 // https://wiki.alliedmods.net/Required_Versions_%28SourceMod%29
 // https://github.com/alliedmodders/sourcemod/tree/master/gamedata/sdktools.games
@@ -213,16 +212,19 @@ pub struct TemplateSet {
 }
 
 /// Manager is responsible for loading and managing a project using its package configuration file, sm-pkg.yaml.
-pub struct Project<'p> {
+pub struct Project<'a> {
     /// Root directory of the project.
-    project_root: &'p Path,
+    project_root: &'a Path,
     pub package: Option<Package>,
-    repo: &'p repo::LocalRepo<'p>,
+    repo: &'a dyn PluginDefinitionProvider<'a>,
 }
 
-impl<'p> Project<'p> {
-    pub fn new(project_root: &'p &Path, repo: &'p repo::LocalRepo) -> BoxResult<Self> {
-        println!("🏗️ Using project root {:?}", project_root);
+impl<'a> Project<'a> {
+    pub fn new(
+        project_root: &'a &Path,
+        repo: &'a dyn PluginDefinitionProvider<'a>,
+    ) -> BoxResult<Self> {
+        debug!("🏗️ Using project root {:?}", project_root);
         Ok(Project {
             project_root,
             repo,
@@ -235,7 +237,7 @@ impl<'p> Project<'p> {
             true => Some(self.existing_project()?),
             false => Some(self.create_package_config()?),
         };
-        println!("🟢 Loaded package config {:?}", self.project_file_path());
+        debug!("🟢 Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
@@ -250,7 +252,7 @@ impl<'p> Project<'p> {
                 .into());
             }
         };
-        println!("📂 Loaded package config {:?}", self.project_file_path());
+        debug!("📂 Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
@@ -291,7 +293,7 @@ impl<'p> Project<'p> {
         match &mut self.package {
             Some(config) => {
                 config.plugins.retain(|p| p != &plugin.name);
-                println!("✅ Plugin Removed {}", plugin.name);
+                info!("✅ Plugin Removed {}", plugin.name);
                 Ok(())
             }
             None => Err("❗ No plugin found?".into()),
@@ -314,7 +316,7 @@ impl<'p> Project<'p> {
     fn existing_project(&mut self) -> BoxResult {
         let file = File::open(self.project_file_path())?;
         let existing_config: Package = serde_yaml::from_reader(file)?;
-        println!(
+        debug!(
             "🔎 Existing project found! (game: {:?})",
             existing_config.game.to_string()
         );
@@ -431,7 +433,7 @@ impl<'p> Project<'p> {
             for (key, value) in &raw_config.options {
                 writeln!(file, "{} \"{}\"", key, value)?;
             }
-            println!("📝 Created {}", out_path.display());
+            info!("📝 Created {}", out_path.display());
         }
 
         Ok(())
@@ -577,7 +579,7 @@ fn write_cfg(format: &TagFormat, path: &Path, template: impl Template) -> BoxRes
     write_tag(format, &mut fp)?;
     match Template::write_into(&template, &mut fp) {
         Ok(()) => {
-            println!("📝 Created {}", path.display());
+            info!("📝 Created {}", path.display());
             Ok(())
         }
         Err(err) => Err(err.into()),

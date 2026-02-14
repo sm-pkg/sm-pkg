@@ -1,21 +1,24 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use env_logger::Env;
 use resolve_path::PathResolveExt;
 use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil,
     plugins::{self, create_build_root},
     project,
-    repo::{self},
+    repo::{self, PluginDefinitionProvider},
     sdk::{self, Branch, Runtime},
 };
 use std::{
     io,
     path::{Path, PathBuf},
 };
+use std::{io::Write, process::ExitCode};
 
 #[cfg(feature = "repo")]
 use std::fs::{self, File};
 
-//const DEFAULT_OUTPUT: &str = "./output";
+#[macro_use]
+extern crate log;
 
 #[derive(Parser, Debug)]
 #[command(name = "completion-derive")]
@@ -125,12 +128,22 @@ enum Commands {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> BoxResult {
-    run().await
+async fn main() -> ExitCode {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+        .format(|buf, record| writeln!(buf, "{}: {}", record.level(), record.args()))
+        .init();
+
+    match run().await {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(err) => {
+            error!("{}", err);
+            ExitCode::FAILURE
+        }
+    }
 }
 
 async fn run() -> BoxResult {
-    println!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
+    info!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
     if let Some(generator) = args.generator {
         let mut cmd = Cli::command();
@@ -140,7 +153,7 @@ async fn run() -> BoxResult {
     let app_root = args.app_root.expect("No app_root path specified");
     let app_root_resolved = app_root.try_resolve()?.to_path_buf();
 
-    println!("🪸 Using app root: {:?}", app_root_resolved);
+    debug!("🪸 Using app root: {:?}", app_root_resolved);
 
     if !app_root_resolved.exists() {
         std::fs::create_dir_all(&app_root_resolved)?;
@@ -201,7 +214,7 @@ async fn plugin_build(
     match plugins::build(app_root, &sdk_env, &build_root, &repo, plugins) {
         Err(e) => return Err(format!("❌ Failed to build plugins: {}", e).into()),
         Ok(_) => {
-            println!("✅ Plugins built successfully: {}", build_root.display());
+            error!("✅ Plugins built successfully: {}", build_root.display());
         }
     };
 
@@ -228,11 +241,11 @@ async fn package_list(app_root: &Path, project_root: &Path) -> BoxResult {
         None => return Err("❗ No package config found".into()),
         Some(config) => {
             if config.plugins.is_empty() {
-                println!("🤷‍♂️ No plugins added");
+                error!("🤷‍♂️ No plugins added");
             } else {
-                println!("📋 Plugins added to package:");
+                info!("📋 Plugins added to package:");
                 for plugin in config.plugins {
-                    println!("- {}", plugin);
+                    info!("- {}", plugin);
                 }
             }
         }
@@ -245,9 +258,16 @@ async fn package_remove(app_root: &Path, project_root: &Path, plugins: Vec<Strin
     let mut project_manager = project::Project::new(&project_root, &repo)?;
     project_manager.open()?;
 
-    for plugin in plugins {
-        project_manager.remove_plugin(repo.find_plugin_definition(&plugin)?)?;
-    }
+    plugins.iter().try_for_each(|p| -> BoxResult {
+        let def = repo.find_plugin_definition(&p)?;
+        project_manager.remove_plugin(def)?;
+        Ok(())
+    })?;
+
+    // for plugin in plugins {
+    //     let def = repo.find_plugin_definition(&plugin)?;
+    //     project_manager.remove_plugin(def)?;
+    // }
 
     project_manager.save_package_config()?;
 
@@ -297,7 +317,7 @@ async fn package_install(app_root: &Path, project_root: &Path) -> BoxResult {
     let sm_root = mod_folder.join("addons").join("sourcemod");
 
     for build_root in outputs {
-        println!("📀 Installing {:?} -> {:?}", &build_root, &sm_root);
+        info!("📀 Installing {:?} -> {:?}", &build_root, &sm_root);
         fsutil::copy_dir_all(&build_root, &sm_root)?;
     }
 
@@ -309,23 +329,23 @@ async fn search(root_path: &Path, query: String) -> BoxResult {
     let matches: Vec<plugins::Definition> = repo.search(&query)?;
     matches
         .into_iter()
-        .for_each(|p| println!("{} - {} - {}", p.name, p.version, p.description));
+        .for_each(|p| info!("{} - {} - {}", p.name, p.version, p.description));
     Ok(())
 }
 
 async fn update(root_path: &Path) -> BoxResult {
     let repo = repo::LocalRepo::new(root_path);
     repo.update().await?;
-    println!("✅ Updated local package cache");
+    info!("✅ Updated local package cache");
     Ok(())
 }
 
 async fn sdk_list(root: &Path) -> BoxResult {
     let sdk_manager = sdk::Manager::new(root);
-    println!("🛠️  Currently installed sourcemod SDKs:\n");
+    info!("🛠️  Currently installed sourcemod SDKs:\n");
     let sdks = sdk_manager.get_installed_sdks();
     for sdk in sdks {
-        println!("🏷️  {}", sdk);
+        info!("🏷️  {}", sdk);
     }
     Ok(())
 }
@@ -337,7 +357,7 @@ async fn sdk_latest(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResul
         Runtime::Sourcemod => manager.fetch_latest_sourcemod_build(branch).await?,
     };
 
-    println!("🕓 Latest version: {version}");
+    info!("🕓 Latest version: {version}");
     Ok(())
 }
 
@@ -361,7 +381,7 @@ async fn build_index() -> BoxResult {
     for name in fs::read_dir(".")? {
         let fp = match name {
             Err(_) => continue,
-            Ok(p) => p.path().join(plugins::PLUGIN_DEFINITION_FILE),
+            Ok(p) => p.path().join(sm_pkg::PLUGIN_DEFINITION_FILE),
         };
         if !fp.exists() {
             continue;
@@ -370,7 +390,7 @@ async fn build_index() -> BoxResult {
         specs.push(definition);
     }
 
-    let mut output = File::create(repo::INDEX_FILE)?;
+    let mut output = File::create(sm_pkg::INDEX_FILE)?;
     serde_yaml::to_writer(&mut output, &specs)?;
 
     println!(
@@ -400,7 +420,7 @@ async fn build_all_plugins(root_path: &Path, branch: &Branch) -> BoxResult {
         ) {
             Err(e) => {
                 errors += 1;
-                eprintln!("❌ Failed to build plugin: {} - {}", e, &plugin_def.name);
+                error!("❌ Failed to build plugin: {} - {}", e, &plugin_def.name);
             }
             Ok(_) => continue,
         };

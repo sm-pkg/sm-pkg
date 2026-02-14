@@ -23,5 +23,7 @@ pkgs.mkShell {
     goreleaser
     zig # required by goreleaser
     just
+    nil
+    nixd
   ];
 }
