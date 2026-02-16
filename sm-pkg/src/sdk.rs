@@ -342,11 +342,7 @@ impl Environment {
                     None => debug!("Output path: ."),
                 }
 
-                let output = match command.output() {
-                    Err(err) => return Err(err.into()),
-                    Ok(output) => output,
-                };
-
+                let output = command.output()?;
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 match args.verbose.unwrap_or(0) {
