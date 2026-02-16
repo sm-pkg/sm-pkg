@@ -23,6 +23,8 @@ pkgs.mkShell {
     goreleaser
     zig # required by goreleaser
     just
+    just-lsp
+    cargo-toml-lint
     nil
     nixd
     cargo-machete
