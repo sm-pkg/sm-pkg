@@ -224,7 +224,7 @@ impl<'a> Project<'a> {
         project_root: &'a &Path,
         repo: &'a dyn PluginDefinitionProvider<'a>,
     ) -> BoxResult<Self> {
-        debug!("🏗️ Using project root {:?}", project_root);
+        debug!("Using project root {:?}", project_root);
         Ok(Project {
             project_root,
             repo,
@@ -237,7 +237,7 @@ impl<'a> Project<'a> {
             true => Some(self.existing_project()?),
             false => Some(self.create_package_config()?),
         };
-        debug!("🟢 Loaded package config {:?}", self.project_file_path());
+        debug!("Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
@@ -252,7 +252,7 @@ impl<'a> Project<'a> {
                 .into());
             }
         };
-        debug!("📂 Loaded package config {:?}", self.project_file_path());
+        debug!("Loaded package config {:?}", self.project_file_path());
         Ok(())
     }
 
@@ -293,7 +293,7 @@ impl<'a> Project<'a> {
         match &mut self.package {
             Some(config) => {
                 config.plugins.retain(|p| p != &plugin.name);
-                info!("✅ Plugin Removed {}", plugin.name);
+                info!("Plugin Removed {}", plugin.name);
                 Ok(())
             }
             None => Err("❗ No plugin found?".into()),
@@ -317,7 +317,7 @@ impl<'a> Project<'a> {
         let file = File::open(self.project_file_path())?;
         let existing_config: Package = serde_yaml::from_reader(file)?;
         debug!(
-            "🔎 Existing project found! (game: {:?})",
+            "Existing project found! (game: {:?})",
             existing_config.game.to_string()
         );
         self.package = Some(existing_config);
@@ -433,7 +433,7 @@ impl<'a> Project<'a> {
             for (key, value) in &raw_config.options {
                 writeln!(file, "{} \"{}\"", key, value)?;
             }
-            info!("📝 Created {}", out_path.display());
+            info!("Created {}", out_path.display());
         }
 
         Ok(())
@@ -579,7 +579,7 @@ fn write_cfg(format: &TagFormat, path: &Path, template: impl Template) -> BoxRes
     write_tag(format, &mut fp)?;
     match Template::write_into(&template, &mut fp) {
         Ok(()) => {
-            info!("📝 Created {}", path.display());
+            info!("Created {}", path.display());
             Ok(())
         }
         Err(err) => Err(err.into()),

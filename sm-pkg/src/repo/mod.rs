@@ -63,9 +63,9 @@ impl<'a> LocalRepo<'a> {
     // git checkout
     pub async fn checkout_repo(&self) -> BoxResult {
         let out_root = self.root_dir().join("repo");
-        info!("📢 Downloading repo snapshot");
+        info!("Downloading repo snapshot");
         let body = reqwest::get(REPO_URL).await?.bytes().await?;
-        info!("✅ Successfully downloaded");
+        info!("Successfully downloaded");
 
         if out_root.exists() {
             remove_dir_all(&out_root)?;
@@ -80,7 +80,7 @@ impl<'a> LocalRepo<'a> {
             let dest_path = out_root.join(archive_path.strip_prefix("plugins-master")?);
             if file.is_directory {
                 create_dir_all(&dest_path)?;
-                debug!("📝 {}", dest_path.display());
+                debug!("{}", dest_path.display());
             } else {
                 write(&dest_path, &file.data)?;
             }

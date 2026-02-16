@@ -123,9 +123,9 @@ impl<'a> Manager<'a> {
     }
 
     pub async fn install_sourcemod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
-        info!("⏳ Fetching latest version... ");
+        info!("Fetching latest version... ");
         let latest_version = Self::fetch_latest_sourcemod_build(self, branch).await?;
-        info!("🔎 Found: {latest_version}");
+        info!("Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
             let target = format!(
@@ -133,7 +133,7 @@ impl<'a> Manager<'a> {
                 self.get_sdk_branch_version(&Runtime::Sourcemod, branch),
                 &latest_version
             );
-            info!("💾 Downlading sourcemod sdk: {target}...");
+            info!("Downlading sourcemod sdk: {target}...");
             let mut of = File::create(&archive_path)?;
             self.fetch_archive(target, &mut of).await?;
         }
@@ -144,9 +144,9 @@ impl<'a> Manager<'a> {
     }
 
     pub async fn install_metamod(&self, branch: &Branch, target_dir: &PathBuf) -> BoxResult {
-        info!("⏳ Fetching latest version... ");
+        info!("Fetching latest version... ");
         let latest_version = Self::fetch_latest_metamod_build(self, branch).await?;
-        info!("🔎 Found: {latest_version}");
+        info!("Found: {latest_version}");
         let archive_path = self.ensure_cache_dir()?.join(&latest_version);
         if !archive_path.exists() {
             let target = format!(
@@ -154,7 +154,7 @@ impl<'a> Manager<'a> {
                 self.get_sdk_branch_version(&Runtime::Metamod, branch),
                 &latest_version
             );
-            info!("💾 Downlading metamod sdk: {target}...");
+            info!("Downlading metamod sdk: {target}...");
             let mut of = File::create(&archive_path)?;
             self.fetch_archive(target, &mut of).await?;
         }
@@ -165,7 +165,7 @@ impl<'a> Manager<'a> {
     }
 
     fn extract_archive(&self, archive_path: &PathBuf, out_path: &PathBuf) -> BoxResult {
-        info!("📤 Extracting into: {:?}...", out_path);
+        info!("Extracting into: {:?}...", out_path);
         let input_archive = File::open(archive_path)?;
         let mut archive = Archive::new(GzDecoder::new(&input_archive));
         archive.unpack(out_path)?;
@@ -203,7 +203,7 @@ impl<'a> Manager<'a> {
                 Some(latest_sdk) => {
                     let sm_root = self.app_root.join("sdks").join(path::Path::new(latest_sdk));
                     let current_root = self.app_root.join("sdks/current");
-                    info!("⭐ Activating {latest_sdk} @ {current_root:?}");
+                    info!("Activating {latest_sdk} @ {current_root:?}");
 
                     if current_root.exists() {
                         remove_file(&current_root)?;
@@ -336,22 +336,32 @@ impl Environment {
 
                 let mut command = self.build_command(args);
                 command.arg(input);
-                print!("🔨 Compiling {:?} -> ", input);
+
                 match &args.output {
-                    Some(out) => println!("{}", out.display()),
-                    None => println!("."),
+                    Some(out) => debug!("Output path: {}", out.display()),
+                    None => debug!("Output path: ."),
                 }
 
-                let output = command.output().expect("Failed to execute spcomp64");
+                let output = match command.output() {
+                    Err(err) => return Err(err.into()),
+                    Ok(output) => output,
+                };
+
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 match args.verbose.unwrap_or(0) {
                     0 => (),
-                    _ => print!("{}", stdout),
+                    _ => info!("{}", stdout),
                 }
                 if !stderr.is_empty() {
-                    print!("{}", stderr);
+                    error!("{}", stderr);
                 }
+
+                if !output.status.success() {
+                    return Err(format!("Failed to compile plugin: {:?}", input).into());
+                }
+
+                info!("Built {}", input.display());
             }
         }
 

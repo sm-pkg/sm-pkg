@@ -64,7 +64,7 @@ pub fn build(
                         format!("Dependency include directory not found: {:?}", inc_tree).into(),
                     );
                 }
-                debug!("➕ Adding {} includes", dep);
+                debug!("Adding {} includes", dep);
                 fsutil::copy_dir_all(inc_tree, &include_dir)?;
             }
         }

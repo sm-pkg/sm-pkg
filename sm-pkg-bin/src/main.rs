@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use env_logger::Env;
+use log::Level;
 use resolve_path::PathResolveExt;
 use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil,
@@ -38,6 +39,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    #[command(about = "sm-pkg version information")]
+    Version,
     #[command(about = "Initialize a new project")]
     Init {
         #[arg(short, long, default_value = ".", value_hint = ValueHint::DirPath)]
@@ -130,10 +133,20 @@ enum Commands {
     },
 }
 
+fn level_to_emoji(level: Level) -> &'static str {
+    match level {
+        Level::Error => "🚨",
+        Level::Warn => "💬",
+        Level::Info => "✅",
+        Level::Debug => "💡",
+        Level::Trace => "🔍",
+    }
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> ExitCode {
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
-        .format(|buf, record| writeln!(buf, "{}: {}", record.level(), record.args()))
+        .format(|buf, record| writeln!(buf, "{} {}", level_to_emoji(record.level()), record.args()))
         .init();
 
     match run().await {
@@ -146,7 +159,6 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> BoxResult {
-    info!("📦 sm-pkg - sourcemod package manager - {}", VERSION);
     let args = Cli::parse();
     if let Some(generator) = args.generator {
         let mut cmd = Cli::command();
@@ -156,7 +168,7 @@ async fn run() -> BoxResult {
     let app_root = args.app_root.expect("No app_root path specified");
     let app_root_resolved = app_root.try_resolve()?.to_path_buf();
 
-    debug!("🪸 Using app root: {:?}", app_root_resolved);
+    debug!("Using app root: {:?}", app_root_resolved);
 
     if !app_root_resolved.exists() {
         std::fs::create_dir_all(&app_root_resolved)?;
@@ -197,7 +209,14 @@ async fn run() -> BoxResult {
         Commands::BuildIndex {} => build_index().await,
         #[cfg(feature = "repo")]
         Commands::BuildAll { branch } => build_all_plugins(&app_root_resolved, &branch).await,
+        Commands::Version => version(),
     }
+}
+
+fn version() -> BoxResult {
+    info!("sm-pkg version: {}", VERSION);
+    info!("Homepage: https://github.com/sm-pkg/sm-pkg");
+    Ok(())
 }
 
 async fn plugin_build(
@@ -244,9 +263,9 @@ async fn package_list(app_root: &Path, project_root: &Path) -> BoxResult {
         None => return Err("❗ No package config found".into()),
         Some(config) => {
             if config.plugins.is_empty() {
-                error!("🤷‍♂️ No plugins added");
+                error!("No plugins added");
             } else {
-                info!("📋 Plugins added to package:");
+                info!("Plugins added to package:");
                 for plugin in config.plugins {
                     info!("- {}", plugin);
                 }
@@ -320,7 +339,7 @@ async fn package_install(app_root: &Path, project_root: &Path) -> BoxResult {
     let sm_root = mod_folder.join("addons").join("sourcemod");
 
     for build_root in outputs {
-        info!("📀 Installing {:?} -> {:?}", &build_root, &sm_root);
+        info!("Installing {:?} -> {:?}", &build_root, &sm_root);
         fsutil::copy_dir_all(&build_root, &sm_root)?;
     }
 
@@ -344,17 +363,17 @@ async fn update(root_path: &Path) -> BoxResult {
     )?;
     r.pull()?;
 
-    info!("✅ Updated local package cache");
+    info!("Updated local package cache");
 
     Ok(())
 }
 
 async fn sdk_list(root: &Path) -> BoxResult {
     let sdk_manager = sdk::Manager::new(root);
-    info!("🛠️  Currently installed sourcemod SDKs:\n");
+    info!("Currently installed sourcemod SDKs:\n");
     let sdks = sdk_manager.get_installed_sdks();
     for sdk in sdks {
-        info!("🏷️  {}", sdk);
+        info!("{}", sdk);
     }
     Ok(())
 }
@@ -366,7 +385,7 @@ async fn sdk_latest(root: &Path, runtime: &Runtime, branch: &Branch) -> BoxResul
         Runtime::Sourcemod => manager.fetch_latest_sourcemod_build(branch).await?,
     };
 
-    info!("🕓 Latest version: {version}");
+    info!("Latest version: {version}");
     Ok(())
 }
 

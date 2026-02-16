@@ -8,6 +8,9 @@ default_root := env('PROJECT_ROOT', '../tf2/server')
 
 check: clippy audit machete
 
+fix:
+    cargo machete  --with-metadata --fix
+
 machete:
     cargo machete  --with-metadata
 
