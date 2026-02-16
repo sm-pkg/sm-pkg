@@ -5,7 +5,10 @@ use sm_pkg::{
     BoxResult, DEFAULT_ROOT, VERSION, fsutil,
     plugins::{self, create_build_root},
     project,
-    repo::{self, PluginDefinitionProvider},
+    repo::{
+        self, PluginDefinitionProvider,
+        git::{DEFAULT_BRANCH, DEFAULT_REPO_URL, Git},
+    },
     sdk::{self, Branch, Runtime},
 };
 use std::{
@@ -334,9 +337,15 @@ async fn search(root_path: &Path, query: String) -> BoxResult {
 }
 
 async fn update(root_path: &Path) -> BoxResult {
-    let repo = repo::LocalRepo::new(root_path);
-    repo.update().await?;
+    let r = Git::open_or_create(
+        root_path.join("repo").as_path(),
+        DEFAULT_REPO_URL,
+        DEFAULT_BRANCH,
+    )?;
+    r.pull()?;
+
     info!("✅ Updated local package cache");
+
     Ok(())
 }
 

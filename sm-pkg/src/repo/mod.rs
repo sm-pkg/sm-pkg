@@ -1,3 +1,4 @@
+pub mod git;
 pub mod local_path;
 pub mod overlay;
 

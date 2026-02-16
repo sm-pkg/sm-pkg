@@ -9,9 +9,11 @@ license.workspace = true
 [dependencies]
 archive = "0.3.0"
 askama = "0.15.4"
+auth-git2 = "0.5.8"
 chrono = "0.4.43"
 clap = { version = "4.5.58", features = ["derive", "color", "env"] }
 flate2 = { version = "1.1.9", features = ["zlib-rs"] }
+git2 = { version = "0.20.4", features = ["https", "ssh"] }
 inquire = "0.9.3"
 log = "0.4.29"
 reqwest = { version = "0.13.2", features = ["json", "rustls"] }
